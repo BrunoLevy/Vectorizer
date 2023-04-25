@@ -98,7 +98,6 @@ static inline void gfx_hline_internal(int x1, int x2, int y) {
     assert(x1 >= 0 && x1 < GFX_SIZE);
     assert(x2 >= 0 && x2 < GFX_SIZE);    
     assert(y >= 0 && y < GFX_SIZE);
-    // Should be faster, but it is buggy
     x1 = x1 >> 1;
     x2 = x2 >> 1;   
     y  = y  >> 2;

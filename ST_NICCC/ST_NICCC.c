@@ -28,7 +28,6 @@ int main(int argc, char** argv) {
             }
             while(st_niccc_read_polygon(&io,&frame,&polygon)) {
                 uint8_t color = polygon.color;
-                // gfx_setcolor(255,255,255);
                 gfx_setcolor(
                     frame.cmap_r[color],
                     frame.cmap_g[color],
