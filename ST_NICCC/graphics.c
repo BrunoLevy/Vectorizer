@@ -63,13 +63,11 @@ void gfx_clear() {
     memset(gfx_framebuffer_, 0, GFX_SIZE*GFX_SIZE*2);
 }
 
-void gfx_setcolor(int color) {
-    gfx_color = color;
-}
-
-int gfx_encode_color(int r3, int g3, int b3) {
-    // RGB565 encoding
-    return (b3 << 2) | (g3 << 8) | (r3 << 13);
+void gfx_setcolor(int r, int g, int b) {
+    int r3 = r>>5;
+    int g3 = g>>5;
+    int b3 = b>>5;
+    gfx_color = (b3 << 2) | (g3 << 8) | (r3 << 13);
 }
 
 #endif
@@ -111,19 +109,19 @@ void gfx_clear() {
            "\033[2J");       /* clear screen */
 }
 
-void gfx_setcolor(int color) {
-    if(color != gfx_color) {
-        printf("\033[48;5;%dm",color);
-    }
-    gfx_color = color;
-}
-
-int gfx_encode_color(int r3, int g3, int b3) {
+void gfx_setcolor(int r, int g, int b) {
+    int r3 = r>>5;
+    int g3 = g>>5;
+    int b3 = b>>5;
     // Re-encode r,g,b as ANSI 8-bits color
     b3 = b3 * 6 / 8;
     g3 = g3 * 6 / 8;
-    r3 = r3 * 6 / 8;		
-    return 16 + b3 + 6*(g3 + 6*r3);
+    r3 = r3 * 6 / 8;
+    int new_color = 16 + b3 + 6*(g3 + 6*r3);
+    if(new_color != gfx_color) {
+        printf("\033[48;5;%dm",new_color);
+    }
+    gfx_color = new_color;
 }
 
 #endif

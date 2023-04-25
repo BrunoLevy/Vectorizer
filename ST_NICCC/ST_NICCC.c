@@ -102,7 +102,9 @@ static inline uint16_t next_spi_word() {
  * The colormap, encoded in such a way that it
  * can be directly sent as ANSI color codes.
  */
-int cmap[16];
+int cmap_r[16];
+int cmap_g[16];
+int cmap_b[16];
 
 /*
  * Current frame's vertices coordinates (if frame is indexed),
@@ -145,13 +147,13 @@ int read_frame() {
 	for(int b=15; b>=0; --b) {
 	    if(colors & (1 << b)) {
 		int rgb = next_spi_word();
-	       
 		// Get the three 3-bits per component R,G,B
 	        int b3 = (rgb & 0x007);
 		int g3 = (rgb & 0x070) >> 4;
 		int r3 = (rgb & 0x700) >> 8;
-
-                cmap[15-b] = gfx_encode_color(r3,g3,b3);
+                cmap_r[15-b] = r3 << 5;
+                cmap_g[15-b] = g3 << 5;
+                cmap_b[15-b] = b3 << 5;                
 	    }
 	}
     }
@@ -203,7 +205,11 @@ int read_frame() {
 		poly[2*i+1] = next_spi_byte();
 	    }
 	}
-        gfx_setcolor(cmap[poly_col]);
+        gfx_setcolor(
+            cmap_r[poly_col],
+            cmap_g[poly_col],
+            cmap_b[poly_col]
+        );
 	gfx_fillpoly(nvrtx,poly);
     }
     return 1; 
