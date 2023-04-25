@@ -79,10 +79,15 @@ int gfx_encode_color(int r3, int g3, int b3) {
 #ifdef GFX_BACKEND_ANSI
 
 static inline void gfx_setpixel_internal(int x, int y) {
+   x = x >> 1;
+   y = y >> 2;
    printf("\033[%d;%dH ",y,x); // Goto_XY(x1,y) and print space
 }
 
 static inline void gfx_hline_internal(int x1, int x2, int y) {
+    x1 = x1 >> 1;
+    x2 = x2 >> 1;   
+    y  = y >> 2;
     printf("\033[%d;%dH",y,x1); // Goto_XY(x1,y)
     for(int x=x1; x<x2; ++x) {
         putchar(' ');

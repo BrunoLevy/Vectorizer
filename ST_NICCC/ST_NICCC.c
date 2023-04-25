@@ -6,24 +6,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Map coordinates from file to screen
-
-#ifdef GFX_BACKEND_ANSI
-   static inline uint8_t map_x(uint8_t x) {
-       return x >> 1;
-   }
-   static inline uint8_t map_y(uint8_t y) {
-       return y >> 2;
-   }
-#else
-   static inline uint8_t map_x(uint8_t x) {
-       return x;
-   }
-   static inline uint8_t map_y(uint8_t y) {
-       return y;
-   }
-#endif
-
 /**********************************************************************************/
 
 /*
@@ -182,8 +164,8 @@ int read_frame() {
     if(frame_flags & INDEXED_BIT) {
 	uint8_t nb_vertices = next_spi_byte();
 	for(int v=0; v<nb_vertices; ++v) {
-	    X[v] = map_x(next_spi_byte());
-	    Y[v] = map_y(next_spi_byte());
+	    X[v] = next_spi_byte();
+	    Y[v] = next_spi_byte();
 	}
     }
 
@@ -217,8 +199,8 @@ int read_frame() {
 		poly[2*i]   = X[index];
 		poly[2*i+1] = Y[index];
 	    } else {
-		poly[2*i]   = map_x(next_spi_byte());
-		poly[2*i+1] = map_y(next_spi_byte());
+		poly[2*i]   = next_spi_byte();
+		poly[2*i+1] = next_spi_byte();
 	    }
 	}
         gfx_setcolor(cmap[poly_col]);
