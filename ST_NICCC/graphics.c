@@ -1,6 +1,7 @@
 #include "graphics.h"
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #ifdef __linux__
 #include <unistd.h>
@@ -91,7 +92,7 @@ static inline void gfx_hline_internal(int x1, int x2, int y) {
 void gfx_init() {
     gfx_wireframe = 0;
     gfx_clear();
-    // printf("\x1B[?25l"); // hide cursor
+    printf("\x1B[?25l"); // hide cursor
 }
 
 void gfx_swapbuffers() {
@@ -217,9 +218,7 @@ void gfx_fillpoly(int nb_pts, int* points) {
 	int y2 = points[2*i2+1];
 
         if(gfx_wireframe) {
-	   if((clockwise > 0) ^ (y2 > y1)) {
-	      gfx_line(x1,y1,x2,y2);
-	   }
+            gfx_line(x1,y1,x2,y2);
 	    continue;
 	}
        
@@ -263,7 +262,9 @@ void gfx_fillpoly(int nb_pts, int* points) {
 
     if(!gfx_wireframe) {
 	for(int y = miny; y <= maxy; ++y) {
-            gfx_hline_internal(x_left[y],x_right[y],y);
+            gfx_hline_internal(
+                x_left[y], x_right[y], y
+            );
 	}
     }
 }
