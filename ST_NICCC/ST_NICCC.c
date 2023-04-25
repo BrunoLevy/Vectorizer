@@ -1,225 +1,28 @@
 /*
- * Reading the ST-NICCC megademo data stored in
- * the SPI flash and streaming it to polygons,
- * rendered as ANSI character sequences through
- * the UART.
- * 
- * The polygon stream is a 640K file, that needs
- * to be stored in the SPI flash, using:
- * ICEStick: iceprog -o 1M EXAMPLES/DATA/scene1.dat
- * ULX3S:    cp EXAMPLES/DATA/scene1.dat scene1.img
- *           ujprog -j flash -f 1048576 scene1.img
- *   (using latest version of ujprog compiled from https://github.com/kost/fujprog)
- *
- * More details and links in EXAMPLES/DATA/notes.txt
+ * Reading the ST-NICCC megademo data 
  */
 
+#include "graphics.h"
 #include <stdint.h>
-#include <stdio.h>
-
-#ifdef __linux__
 #include <stdlib.h>
-#include <unistd.h>
-#endif
-
-
-//#define RV32_FASTCODE __attribute((section(".fastcode")))
-#define RV32_FASTCODE
-
-int wireframe = 0;
-
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
-#define MAX(x,y) ((x) > (y) ? (x) : (y))
-
-/**********************************************************************************/
-/* Graphics routines                                                              */
-/**********************************************************************************/
-
 
 // Map coordinates from file to screen
 
-static inline uint8_t map_x(uint8_t x) {
-    return x >> 1;
-}
-
-static inline uint8_t map_y(uint8_t y) {
-    return y >> 2;
-}
-
-
-void GL_clear() {
-    printf("\033[48;5;16m"   // set background color black
-           "\033[2J");       // clear screen
-}
-
-
-/* 
- * Set background color using 6x6x6 colorcube codes
- * see https://stackoverflow.com/questions/4842424/list-of-ansi-color-escape-sequences
- */
-static inline void GL_setcolor(int color) {
-   static int last_color = -1;
-   if(color != last_color) {
-      printf("\033[48;5;%dm",color);
+#ifdef GFX_BACKEND_ANSI
+   static inline uint8_t map_x(uint8_t x) {
+       return x >> 1;
    }
-   last_color = color;
-}
-
-static inline void GL_setpixel(int x, int y) {
-   printf("\033[%d;%dH ",y,x); // Goto_XY(x1,y) and print space
-}
-
-void GL_line(int x1, int y1, int x2, int y2) RV32_FASTCODE;
-void GL_line(int x1, int y1, int x2, int y2) {
-    int x,y,dx,dy,sy,tmp;
-
-    // Swap both extremities to ensure x increases
-    if(x2 < x1) {
-       tmp = x2;
-       x2 = x1;
-       x1 = tmp;
-       tmp = y2;
-       y2 = y1;
-       y1 = tmp;
-    }
-   
-    /* Bresenham line drawing. */
-    dy = y2 - y1;
-    sy = 1;
-    if(dy < 0) {
-	sy = -1;
-	dy = -dy;
-    }
-
-    dx = x2 - x1;
-   
-    x = x1;
-    y = y1;
-    
-    if(dy > dx) {
-	int ex = (dx << 1) - dy;
-	for(int u=0; u<dy; u++) {
-	    GL_setpixel(x,y);
-	    y += sy;
-	    if(ex >= 0)  {
-		x++;
-		ex -= dy << 1;
-		GL_setpixel(x,y);
-	    }
-	    while(ex >= 0)  {
-		x++;
-		ex -= dy << 1;
-	        putchar(' ');
-	    }
-	    ex += dx << 1;
-	}
-    } else {
-	int ey = (dy << 1) - dx;
-	for(int u=0; u<dx; u++) {
-	    GL_setpixel(x,y);
-	    x++;
-	    while(ey >= 0) {
-		y += sy;
-		ey -= dx << 1;
-		GL_setpixel(x,y);
-	    }
-	    ey += dy << 1;
-	}
-    }
-}
-
-void GL_fillpoly(int nb_pts, int* points) RV32_FASTCODE;
-void GL_fillpoly(int nb_pts, int* points) {
-    static int last_color = -1;
-   
-    char x_left[128];
-    char x_right[128];
-
-    /* Determine clockwise, miny, maxy */
-    int clockwise = 0;
-    int miny =  256;
-    int maxy = -256;
-    
-    for(int i1=0; i1<nb_pts; ++i1) {
-	int i2=(i1==nb_pts-1) ? 0 : i1+1;
-	int i3=(i2==nb_pts-1) ? 0 : i2+1;
-	int x1 = points[2*i1];
-	int y1 = points[2*i1+1];
-	int dx1 = points[2*i2]   - x1;
-	int dy1 = points[2*i2+1] - y1;
-	int dx2 = points[2*i3]   - x1;
-	int dy2 = points[2*i3+1] - y1;
-	clockwise += dx1 * dy2 - dx2 * dy1;
-	miny = MIN(miny,y1);
-	maxy = MAX(maxy,y1);
-    }
-
-    /* Determine x_left and x_right for each scaline */
-    for(int i1=0; i1<nb_pts; ++i1) {
-	int i2=(i1==nb_pts-1) ? 0 : i1+1;
-
-	int x1 = points[2*i1];
-	int y1 = points[2*i1+1];
-	int x2 = points[2*i2];
-	int y2 = points[2*i2+1];
-
-        if(wireframe) {
-	   if((clockwise > 0) ^ (y2 > y1)) {
-	      GL_line(x1,y1,x2,y2);
-	   }
-	    continue;
-	}
-       
-	char* x_buffer = ((clockwise > 0) ^ (y2 > y1)) ? x_left : x_right;
-	int dx = x2 - x1;
-	int sx = 1;
-	int dy = y2 - y1;
-	int sy = 1;
-	int x = x1;
-	int y = y1;
-	int ex;
-	
-	if(dx < 0) {
-	    sx = -1;
-	    dx = -dx;
-	}
-	
-	if(dy < 0) {
-	    sy = -1;
-	    dy = -dy;
-	}
-
-	if(y1 == y2) {
-	   x_left[y1]  = MIN(x1,x2);
-	   x_right[y1] = MAX(x1,x2);
-	   continue;
-	}
-
-	ex = (dx << 1) - dy;
-
-	for(int u=0; u <= dy; ++u) {
-    	    x_buffer[y] = x; 
-	    y += sy;
-	    while(ex >= 0) {
-		x += sx;
-		ex -= dy << 1;
-	    }
-	    ex += dx << 1;
-	}
-    }
-
-    if(!wireframe) {
-	for(int y = miny; y <= maxy; ++y) {
-	    int x1 = x_left[y];
-	    int x2 = x_right[y];
-	    printf("\033[%d;%dH",y,x1); // Goto_XY(x1,y)
-	    for(int x=x1; x<x2; ++x) {
-		putchar(' ');
-	    }
-	}
-    }
-}
-
+   static inline uint8_t map_y(uint8_t y) {
+       return y >> 2;
+   }
+#else
+   static inline uint8_t map_x(uint8_t x) {
+       return x;
+   }
+   static inline uint8_t map_y(uint8_t y) {
+       return y;
+   }
+#endif
 
 /**********************************************************************************/
 
@@ -328,7 +131,7 @@ uint8_t  Y[255];
 
 /*
  * Current polygon vertices, as expected
- * by GL_fillpoly():
+ * by gfx_fillpoly():
  * xi = poly[2*i], yi = poly[2*i+1]
  */
 int      poly[30];
@@ -350,7 +153,7 @@ int      poly[30];
  *   See DATA/test_ST_NICCC.c for an example
  * program.
  */
-int read_frame() RV32_FASTCODE;
+int read_frame();
 int read_frame() {
     uint8_t frame_flags = next_spi_byte();
 
@@ -366,17 +169,13 @@ int read_frame() {
 		int g3 = (rgb & 0x070) >> 4;
 		int r3 = (rgb & 0x700) >> 8;
 
-		// Re-encode them as ANSI 8-bits color
-		b3 = b3 * 6 / 8;
-		g3 = g3 * 6 / 8;
-		r3 = r3 * 6 / 8;		
-		cmap[15-b] = 16 + b3 + 6*(g3 + 6*r3);
+                cmap[15-b] = gfx_encode_color(r3,g3,b3);
 	    }
 	}
     }
 
     if(frame_flags & CLEAR_BIT) {
-       // GL_clear(); 
+        gfx_clear(); 
     }
 
     // Update vertices
@@ -422,27 +221,23 @@ int read_frame() {
 		poly[2*i+1] = map_y(next_spi_byte());
 	    }
 	}
-        GL_setcolor(cmap[poly_col]);
-	GL_fillpoly(nvrtx,poly);
+        gfx_setcolor(cmap[poly_col]);
+	gfx_fillpoly(nvrtx,poly);
     }
     return 1; 
 }
 
 
 int main() {
-    // printf("\x1B[?25l"); // hide cursor
-    wireframe = 0;
-    GL_clear();
+    gfx_init();
     for(;;) {
         spi_reset();
 	while(read_frame()) {
-	   if(wireframe) {
-	      GL_clear();
-	   }
-#ifdef __linux__       
-        usleep(20000);
-#endif       
+            gfx_swapbuffers();
+            if(gfx_wireframe) {
+                gfx_clear();
+            }
 	}
-        wireframe = !wireframe;
+        gfx_wireframe = !gfx_wireframe;
     }
 }

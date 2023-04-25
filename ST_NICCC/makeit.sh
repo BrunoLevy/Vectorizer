@@ -16,4 +16,5 @@ else
   echo "   Using cached scene1.bin"
 fi
 
-g++ ST_NICCC.c -o ST_NICCC
+gcc -DGFX_BACKEND_GLFW ST_NICCC.c graphics.c -lglfw -lGL -o ST_NICCC_glfw
+gcc -DGFX_BACKEND_ANSI ST_NICCC.c graphics.c -o ST_NICCC_console
