@@ -51,6 +51,7 @@ ffmpeg -i VIDEO/video.mp4 -vf fps=$FPS FRAMES/frame%04d.pgm
 
 # Step 3: trace frames
 echo "$0: [3] tracing frames..."
+rm -f PATHS/*
 for frame in `ls FRAMES/*.pgm`
 do
    BASEFRAME=`basename $frame .pgm`
