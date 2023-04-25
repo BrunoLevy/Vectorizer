@@ -24,10 +24,20 @@ GLFWwindow* gfx_window_;
 unsigned short gfx_framebuffer_[GFX_SIZE*GFX_SIZE];
 
 static inline void gfx_setpixel_internal(int x, int y) {
+    assert(x >= 0 && x < GFX_SIZE);
+    assert(y >= 0 && y < GFX_SIZE);    
     gfx_framebuffer_[(GFX_SIZE-1-y)*GFX_SIZE+x] = gfx_color;
 }
 
 static inline void gfx_hline_internal(int x1, int x2, int y) {
+    assert(x1 >= 0 && x1 < GFX_SIZE);
+    assert(x2 >= 0 && x2 < GFX_SIZE);    
+    assert(y >= 0 && y < GFX_SIZE);
+    if(x2 < x1) {
+        int tmp = x1;
+        x1 = x2;
+        x2 = tmp;
+    }
     for(int x=x1; x<x2; ++x) {
         gfx_setpixel_internal(x,y);
     }
@@ -77,18 +87,29 @@ void gfx_setcolor(int r, int g, int b) {
 #ifdef GFX_BACKEND_ANSI
 
 static inline void gfx_setpixel_internal(int x, int y) {
-   x = x >> 1;
-   y = y >> 2;
-   printf("\033[%d;%dH ",y,x); // Goto_XY(x1,y) and print space
+    assert(x >= 0 && x < GFX_SIZE);
+    assert(y >= 0 && y < GFX_SIZE);    
+    x = x >> 1;
+    y = y >> 2;
+    printf("\033[%d;%dH ",y,x); // move cursor to x,y and print space
 }
 
 static inline void gfx_hline_internal(int x1, int x2, int y) {
+    assert(x1 >= 0 && x1 < GFX_SIZE);
+    assert(x2 >= 0 && x2 < GFX_SIZE);    
+    assert(y >= 0 && y < GFX_SIZE);
+    // Should be faster, but it is buggy
     x1 = x1 >> 1;
     x2 = x2 >> 1;   
-    y  = y >> 2;
-    printf("\033[%d;%dH",y,x1); // Goto_XY(x1,y)
+    y  = y  >> 2;
+    if(x2 < x1) {
+        int tmp = x1;
+        x1 = x2;
+        x2 = tmp;
+    }
+    printf("\033[%d;%dH",y,x1); // move cursor to x1,y
     for(int x=x1; x<x2; ++x) {
-        putchar(' ');
+       putchar(' ');
     }
 }
 
@@ -99,6 +120,7 @@ void gfx_init() {
 }
 
 void gfx_swapbuffers() {
+    fflush(stdout);
 #ifdef __linux__       
         usleep(20000);
 #endif       
@@ -107,6 +129,7 @@ void gfx_swapbuffers() {
 void gfx_clear() {
     printf("\033[48;5;16m"   /* set background color black */
            "\033[2J");       /* clear screen */
+    gfx_color = 0;
 }
 
 void gfx_setcolor(int r, int g, int b) {
@@ -187,8 +210,6 @@ void gfx_line(int x1, int y1, int x2, int y2) {
 }
 
 void gfx_fillpoly(int nb_pts, int* points) {
-    static int last_color = -1;
-   
     int x_left[GFX_SIZE];
     int x_right[GFX_SIZE];
 

@@ -168,8 +168,8 @@ int read_frame() {
 }
 
 
-int main() {
-    stream = fopen("scene1.bin","rb");
+int main(int argc, char** argv) {
+   stream = fopen(argc == 2 ? argv[1] : "scene1.bin","rb");
     while(read_frame()) {
     }
 }

@@ -16,5 +16,9 @@ else
   echo "   Using cached scene1.bin"
 fi
 
-gcc -g -DGFX_BACKEND_GLFW ST_NICCC.c graphics.c -lglfw -lGL -o ST_NICCC_glfw
-gcc -g -DGFX_BACKEND_ANSI ST_NICCC.c graphics.c -o ST_NICCC_console
+CFLAGS="-Wall -Wpedantic"
+
+gcc $CFLAGS -DGFX_BACKEND_GLFW ST_NICCC.c graphics.c io.c -lglfw -lGL -o ST_NICCC_glfw
+gcc $CFLAGS -DGFX_BACKEND_ANSI ST_NICCC.c graphics.c io.c -o ST_NICCC_console
+gcc $CFLAGS test_gen_anim.c io.c -lm -o test_gen_anim
+gcc $CFLAGS test_ST_NICCC.c -o test_ST_NICCC
