@@ -5,6 +5,7 @@
 
 VIDEOSOURCE=https://ia802905.us.archive.org/19/items/TouhouBadApple/Touhou%20-%20Bad%20Apple.mp4
 FPS=5
+RESOLUTION=256
 
 ####################################################################
 
@@ -90,7 +91,7 @@ fi
 # Step 2: extract frames
 echo "$0: [2] extracting frames..."
 rm -f FRAMES/*
-ffmpeg -i VIDEO/video.mp4 -vf fps=$FPS FRAMES/frame%04d.pgm
+ffmpeg -i VIDEO/video.mp4 -vf fps=$FPS,scale=$RESOLUTION:-2,setsar=1:1 FRAMES/frame%04d.pgm
 
 # Step 3: trace frames
 echo "$0: [3] tracing frames..."

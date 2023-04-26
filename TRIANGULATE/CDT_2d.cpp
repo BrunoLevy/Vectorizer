@@ -1237,30 +1237,44 @@ namespace GEO {
         geo_debug_assert(l < nv());
         geo_debug_assert(E1 < ncnstr());
         geo_debug_assert(E2 < ncnstr());
-        vec2ih U = point_[j] - point_[i];
-        vec2ih V = point_[l] - point_[k];
-        vec2ih D = point_[k] - point_[i];
-
-        abort();
-        /*
-        int detUV = det(U,V);
-        int detDV = det(D,V);
-        vec2i P(
-            (detUV*point_[i].x + detDV*U.x)/detUV,
-            (detUV*point_[i].y + detDV*U.y)/detUV
-        );
-        */
         
-        /*
-        {
-            std::ofstream out("intersection.obj");
-            out << "v " << P.x << " " << P.y << std::endl;
+        const vec2ih& p1 = point_[i];
+        const vec2ih& p2 = point_[j];
+        const vec2ih& q1 = point_[k];
+        const vec2ih& q2 = point_[l];        
+        
+        vec2ih U = p2-p1;
+        vec2ih V = q2-q1;
+        vec2ih D = q1-p1;
+
+        int64_t t_num   =  det2x2(D.x,D.y,V.x,V.y)*V.w;
+        int64_t t_denom =  det2x2(U.x,U.y,V.x,V.y)*D.w;
+
+        vec2ih I;
+        if(p1.w == p2.w) {
+            I = vec2ih(
+                p1.x * (t_denom - t_num) + p2.x * t_num,
+                p1.y * (t_denom - t_num) + p2.y * t_num,
+                t_denom * p1.w
+            );
+        } else {
+            I = vec2ih(
+                p1.x * p2.w * (t_denom - t_num) + p2.x * p1.w * t_num,
+                p1.y * p2.w * (t_denom - t_num) + p2.y * p1.w * t_num,
+                t_denom * p1.w * p2.w
+            );
         }
-        */
-        /*
-        point_.push_back(P);
+
+        {
+            std::cerr << "INTERSECTION" << std::endl;
+            std::ofstream out("intersection.obj");
+            double x = double(I.x)/double(I.w);
+            double y = double(I.y)/double(I.w);
+            out << "v " << x << " " << y << " 0" << std::endl;
+        }
+        
+        point_.push_back(I);
         v2T_.push_back(index_t(-1));
-        */
         index_t v = nv_;
         ++nv_;
         return v;

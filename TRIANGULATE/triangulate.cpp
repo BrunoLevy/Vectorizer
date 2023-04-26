@@ -24,14 +24,19 @@ bool load_file(const std::string& filename, GEO::CDT2di& triangulation) {
     const int xmax =  7350;
     const int ymin = -8288;
     const int ymax = -4913;
+    const int L = xmax-xmin;
     
     triangulation.clear();
+    triangulation.create_enclosing_rectangle(0,0,255,255);
+    
+    /*
     triangulation.create_enclosing_quad(
         GEO::vec2ih(xmin,ymin),
         GEO::vec2ih(xmax,ymin),
         GEO::vec2ih(xmax,ymax),
         GEO::vec2ih(xmin,ymax)
     );
+    */
     
     std::ifstream in(filename);
     if(!in) {
@@ -88,6 +93,10 @@ bool load_file(const std::string& filename, GEO::CDT2di& triangulation) {
                 x = std::min(x,xmax);
                 y = std::max(y,ymin);
                 y = std::min(y,ymax);
+
+                x = (x-xmin)*255/L;
+                y = (y-ymin)*255/L;
+                
                 vertices.push_back(triangulation.insert(GEO::vec2ih(x,y)));
             }
             for(int i=0; i<npoints; ++i) {
