@@ -295,7 +295,9 @@ namespace GEO {
          * \brief Constants for triangle flags
          */
         enum {
-            T_MARKED_FLAG = DLIST_NB /**< marked triangle */
+            T_MARKED_FLAG  = DLIST_NB,   /**< marked triangle */
+            T_REGION1_FLAG = DLIST_NB+1,
+            T_REGION2_FLAG = DLIST_NB+2
         };
 
         /**

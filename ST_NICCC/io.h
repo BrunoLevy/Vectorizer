@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Masks for frame flags.
  */
@@ -118,4 +122,8 @@ void st_niccc_write_triangle(
 
 /*******************************************************************/
 
+#ifdef __cplusplus
+}
+#endif
+    
 #endif

@@ -246,6 +246,18 @@ void gfx_fillpoly(int nb_pts, int* points) {
 	}
        
 	int* x_buffer = ((clockwise > 0) ^ (y2 > y1)) ? x_left : x_right;
+
+        // ensure consistent rasterization of neighboring edges in
+        // a triangulation, avoid small gaps
+        if(y2 < y1) {
+            int tmp = y1;
+            y1 = y2;
+            y2 = tmp;
+            tmp = x1;
+            x1 = x2;
+            x2 = tmp;
+        }
+        
 	int dx = x2 - x1;
 	int sx = 1;
 	int dy = y2 - y1;

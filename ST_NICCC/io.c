@@ -225,7 +225,7 @@ void st_niccc_write_triangle(
     uint8_t color, uint8_t v1, uint8_t v2, uint8_t v3
 ) {
     uint8_t v[3] = { v1, v2, v3 };
-    st_niccc_write_polygon(io, color, 4, v);
+    st_niccc_write_polygon(io, color, 3, v);
 }
 
 void st_niccc_write_end_of_frame(ST_NICCC_IO* io) {

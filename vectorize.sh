@@ -4,7 +4,10 @@
 # License: BSD 3 clauses
 
 VIDEOSOURCE=https://ia802905.us.archive.org/19/items/TouhouBadApple/Touhou%20-%20Bad%20Apple.mp4
-FPS=5
+#FPS=5
+#RESOLUTION=256
+
+FPS=15
 RESOLUTION=256
 
 ####################################################################

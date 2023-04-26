@@ -1265,12 +1265,16 @@ namespace GEO {
             );
         }
 
+        
         {
             std::cerr << "INTERSECTION" << std::endl;
+            throw(std::logic_error("Intersecting constraints"));
+            /*
             std::ofstream out("intersection.obj");
             double x = double(I.x)/double(I.w);
             double y = double(I.y)/double(I.w);
             out << "v " << x << " " << y << " 0" << std::endl;
+            */
         }
         
         point_.push_back(I);
@@ -1283,8 +1287,8 @@ namespace GEO {
     void CDT2di::save(const std::string& filename) const {
         std::ofstream out(filename);
         for(index_t v=0; v<nv(); ++v) {
-            double x = double(point(v).x)/double(point(v).w);
-            double y = double(point(v).y)/double(point(v).w);
+            double x =  double(point(v).x)/double(point(v).w);
+            double y = -double(point(v).y)/double(point(v).w);
             out << "v " << x << " " << y << " 0" << std::endl;
         }
         for(index_t t=0; t<nT(); ++t) {

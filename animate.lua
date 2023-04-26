@@ -16,8 +16,9 @@ end
 for i = 0,scene_graph.nb_children-1,1 do
    scene_graph.current_object = scene_graph.ith_child(i).name
    main.draw()
-   sleep(0.1)
+   sleep(0.3)
 end
+
 
 
 
