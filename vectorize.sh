@@ -12,11 +12,11 @@ FPS=5
 # usage: fig2obj input.fig output.obj
 fig2obj() {
    awk < $1 '
-      BEGIN { 
-         v_offset=1; 
+      BEGIN {
+         v_offset=1;
          nb_in_polyline=0;
          nb_remaining=0;
-      } { 
+      } {
          if($1 == 3 && NF== 14) {
            nb_in_polyline = $14
            nb_remaining = $14
@@ -35,6 +35,49 @@ fig2obj() {
 } > $2
 
 ####################################################################
+
+fig2movetolineto() {
+   awk < $1 '
+      BEGIN {
+         v_offset=1;
+         nb_in_polyline=0;
+         nb_remaining=0;
+      } {
+
+        if ($1 == 6 && NF == 5)
+        {
+          minx = $2
+          miny = $3
+          maxx = $4
+          maxy = $5
+
+          dx = maxx - minx
+          dy = maxy - miny
+        }
+        else
+
+         if($1 == 3 && NF == 14) {
+           nb_in_polyline = $14
+           nb_remaining = $14
+         } else if(nb_remaining != 0) {
+           if (nb_in_polyline == nb_remaining)
+           {
+             startx = $1
+             starty = $2
+             printf("moveto %d %d\n", $1-minx, dy - ($2-miny))
+           }
+           else printf("lineto %d %d\n", $1-minx, dy - ($2-miny))
+
+           --nb_remaining
+           if(nb_remaining == 0) printf("lineto %d %d\n\n", startx-minx, dy - (starty-miny))
+         }
+      }
+   '
+} > $2
+
+####################################################################
+
+mkdir -p VIDEO FRAMES PATHS
 
 # Step 1: download video
 echo "$0: [1] downloading video..."
@@ -57,6 +100,8 @@ do
    BASEFRAME=`basename $frame .pgm`
    FIGFRAME=PATHS/$BASEFRAME.fig
    OBJFRAME=PATHS/$BASEFRAME.obj
-   potrace -b xfig -a 0 -O 20.0 -r 128x128 $frame -o $FIGFRAME
+   VECTORFRAME=PATHS/$BASEFRAME.vec
+   potrace -b xfig -a 0 -O 20.0 -r 146x146 $frame -o $FIGFRAME
    fig2obj $FIGFRAME $OBJFRAME
+   fig2movetolineto $FIGFRAME $VECTORFRAME
 done
