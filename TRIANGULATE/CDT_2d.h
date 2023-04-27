@@ -102,10 +102,14 @@ namespace GEO {
         void insert_constraint(index_t i, index_t j);
 
         /**
-         * \brief Recursively removes all the triangles adjacent to
-         *  the border, and keeps what's surrounded by constraints
+         * \brief Removes all the triangles that have the flag T_MARKED_FLAG
+         *  set.
+         * \details This compresses the triangle array, and updates triangle
+         *  adjacencies, as well as the vertex to triangle array. Note that
+         *  it uses Tnext_'s storage for internal bookkeeping, so this function
+         *  should not be used if there exists a non-empty DList.
          */
-        void remove_external_triangles();
+        void remove_marked_triangles();
         
         /**
          * \brief Specifies whether a constrained Delaunay
@@ -212,7 +216,6 @@ namespace GEO {
          */
         bool Tedge_is_Delaunay(index_t t, index_t le) const;
 
-    protected:
         /**
          * \brief Inserts a new point 
          * \param[in] v the index of the new point, supposed to be
@@ -295,7 +298,7 @@ namespace GEO {
          * \brief Constants for triangle flags
          */
         enum {
-            T_MARKED_FLAG  = DLIST_NB,   /**< marked triangle */
+            T_MARKED_FLAG  = DLIST_NB,  /**< marked triangle */
             T_REGION1_FLAG = DLIST_NB+1
         };
 
@@ -955,17 +958,6 @@ namespace GEO {
             return result; 
         }
 
-        /*******************************************************************/
-
-        /**
-         * \brief Removes all the triangles that have the flag T_MARKED_FLAG
-         *  set.
-         * \details This compresses the triangle array, and updates triangle
-         *  adjacencies, as well as the vertex to triangle array. Note that
-         *  it uses Tnext_'s storage for internal bookkeeping, so this function
-         *  should not be used if there exists a non-empty DList.
-         */
-        void remove_marked_triangles();
         
         /******************** Debugging ************************************/
 
@@ -986,6 +978,7 @@ namespace GEO {
                 geo_assert(Tadj(t,e) != Tadj(t,(e+1)%3));
                 index_t t2 = Tadj(t,e);
                 index_t e2 = Tadj_find(t2,t);
+                geo_argused(e2);
                 geo_assert(Tadj(t2,e2) == t);
             }
         }
@@ -1262,7 +1255,8 @@ namespace GEO {
          *  or create_enclosing_quad()  need to be called before anything else
          */
         void create_enclosing_quad(
-            const vec2ih& p1, const vec2ih& p2, const vec2ih& p3, const vec2ih& p4
+            const vec2ih& p1, const vec2ih& p2,
+            const vec2ih& p3, const vec2ih& p4
         );
 
 

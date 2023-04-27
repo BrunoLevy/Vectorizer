@@ -8,6 +8,10 @@
 #include <vector>
 
 
+/**
+ * \brief Generates a string of length \p len from integer \p i
+ *  padded with zeroes.
+ */
 std::string to_string(int i, int len) {
     std::ostringstream out; 
     out << i;
@@ -18,27 +22,100 @@ std::string to_string(int i, int len) {
     return result;
 }
 
-bool constraint_is_degenerate(
-    const GEO::CDT2di& triangulation,
-    std::vector<GEO::index_t>& vertices
-) {
-    for(int i=0; i<vertices.size(); ++i) {
-        for(int j=i+1; j<vertices.size(); ++j) {
-            for(int k=j+1; k<vertices.size(); ++k) {
-                if(
-                    triangulation.orient2d(
-                        vertices[i], vertices[j], vertices[k]
-                    ) != GEO::ZERO
-                ) {
-                    return false;
+namespace GEO {
+   /**
+    * \brief Tests whether a constraint is degenerate
+    * \details A constraint is degenerate if all vertices are 
+    *  aligned. Such constraints make the in/out classification
+    *  algorithm fail because they do not have an interior.
+    * \param[in] triangulation a const reference to the CDT2di
+    * \param[in] vertices a vector with the indices of the vertices
+    *  on the constraint
+    * \retval true if all vertices are aligned
+    * \retval false otherwise
+    */
+    bool constraint_is_degenerate(
+        const GEO::CDT2di& triangulation,
+        std::vector<GEO::index_t>& vertices
+    ) {
+        for(int i=0; i<int(vertices.size()); ++i) {
+            for(int j=i+1; j<int(vertices.size()); ++j) {
+                for(int k=j+1; k<int(vertices.size()); ++k) {
+                    if(
+                        triangulation.orient2d(
+                            vertices[i], vertices[j], vertices[k]
+                        ) != GEO::ZERO
+                    ) {
+                        return false;
+                    }
                 }
             }
         }
+        return true;
     }
-    return true;
+
+    /**
+     * \brief Classifies triangles, keeps only the ones inside the shape
+     */
+    void classify_triangles(CDT2di& T) {
+        
+        CDT2di::DList S(T, CDT2di::DLIST_S_ID);
+        
+        // Step 1: get triangles adjacent to the border
+        for(index_t t=0; t<T.nT(); ++t) {
+            if(
+                (T.Tadj(t,0) == index_t(-1)) ||
+                (T.Tadj(t,1) == index_t(-1)) ||
+                (T.Tadj(t,2) == index_t(-1))
+            ) {
+                T.Tset_flag(t, CDT2di::T_MARKED_FLAG);
+                if(
+                    (T.Tadj(t,0)==index_t(-1)&&!T.Tedge_is_constrained(t,0)) ||
+                    (T.Tadj(t,1)==index_t(-1)&&!T.Tedge_is_constrained(t,1)) ||
+                    (T.Tadj(t,2)==index_t(-1)&&!T.Tedge_is_constrained(t,2))
+                ) {
+                    T.Tset_flag(t, CDT2di::T_REGION1_FLAG);
+                }
+                S.push_back(t);
+            }
+        }
+        
+        // Step 2: recursive traversal
+        while(!S.empty()) {
+            index_t t1 = S.pop_back();
+            for(index_t le=0; le<3; ++le) {
+                index_t t2 = T.Tadj(t1,le); 
+                if(
+                    t2 != index_t(-1) &&
+                    !T.Tflag_is_set(t2, CDT2di::T_MARKED_FLAG)
+                ) {
+                    T.Tset_flag(t2,CDT2di::T_MARKED_FLAG);
+                    if(
+                        T.Tedge_is_constrained(t1,le) ^ 
+                        T.Tflag_is_set(t1,CDT2di::T_REGION1_FLAG)
+                    ) {
+                        T.Tset_flag(t2,CDT2di::T_REGION1_FLAG);
+                    }
+                    S.push_back(t2);
+                }
+            }
+        }
+
+        // Step 3: mark triangles to be discarded
+        for(index_t t=0; t<T.nT(); ++t) {
+            if(T.Tflag_is_set(t,CDT2di::T_REGION1_FLAG)) {
+                T.Tset_flag(t, CDT2di::T_MARKED_FLAG);
+            } else {
+                T.Treset_flag(t, CDT2di::T_MARKED_FLAG);
+            }
+        }
+
+        // Step 4: remove marked triangles
+        T.remove_marked_triangles();
+    }
 }
-    
-// Parse .fig file
+
+// Parse .fig file and append content to ST_NICCC file
 // Reference: https://mcj.sourceforge.net/fig-format.html
 bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
 
@@ -50,7 +127,6 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
     int ymax = 7389;
     int L = xmax-xmin;
     
-    triangulation.clear();
     triangulation.create_enclosing_rectangle(0,0,255,255);
     
     std::ifstream in(filename);
@@ -144,12 +220,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
             }
         }
         triangulation.save(filename+"_triangulation.obj");
-        triangulation.remove_external_triangles();
-        /*
-        if(triangulation.nv() > 255) {
-            throw(std::logic_error("Too many vertices in frame"));
-        }
-        */
+        GEO::classify_triangles(triangulation);
     } catch(const std::logic_error& e) {
         // I still have a problem with intersecting constraint for
         // integer coordinates (to be fixed).
@@ -157,7 +228,6 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         // than 255 (cannot be stored in ST_NICCC file). Well, in
         // fact we could use "direct" mode in that case (TODO...)
         std::cerr << "Exception caught: " << e.what() << std::endl;
-        
         // If there was a problem, create an empty frame
         ST_NICCC_FRAME frame;
         st_niccc_frame_init(&frame);
@@ -173,13 +243,16 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
     if(triangulation.nv() <= 255) {
         for(GEO::index_t v=0; v<triangulation.nv(); ++v) {
             int x = (triangulation.point(v).x / triangulation.point(v).w);
-            int y = (triangulation.point(v).y / triangulation.point(v).w);        
+            int y = (triangulation.point(v).y / triangulation.point(v).w);
             st_niccc_frame_set_vertex(&frame, v, x, y);
         }
-        st_niccc_write_frame(io,&frame);    
+        st_niccc_write_frame(io,&frame);
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
             st_niccc_write_triangle_indexed(
-                io,1,triangulation.Tv(t,0),triangulation.Tv(t,1),triangulation.Tv(t,2)
+                io,1,
+                triangulation.Tv(t,0),
+                triangulation.Tv(t,1),
+                triangulation.Tv(t,2)
             );
         }
     } else {

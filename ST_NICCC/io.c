@@ -1,4 +1,5 @@
 #include "io.h"
+#include <stdlib.h>
 
 int st_niccc_open(
     ST_NICCC_IO* io, const char* filename, int mode
@@ -32,7 +33,11 @@ uint8_t st_niccc_read_byte(ST_NICCC_IO* io){
    if(io->word_addr != io->addr >> 2) {
        io->word_addr = io->addr >> 2;
        fseek(io->f, io->word_addr*4, SEEK_SET);
-       fread(&(io->u.word), 4, 1, io->f);
+       size_t result = fread(&(io->u.word), 4, 1, io->f);
+       if(result != 1) {
+           fprintf(stderr,"ST_NICCC: read error\n");
+           exit(-1);
+       }
    }
    result = io->u.bytes[(io->addr)&3];
    ++(io->addr);

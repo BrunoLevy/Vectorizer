@@ -712,6 +712,7 @@ namespace GEO {
             // You will land here if we try to locate a point outside
             // the boundary
             bool point_outside_boundary = (t == index_t(-1));
+            geo_argused(point_outside_boundary);
             geo_assert(!point_outside_boundary);
              
             index_t tv[3];
@@ -764,62 +765,7 @@ namespace GEO {
 
         return t;
     }
-
-    void CDTBase2d::remove_external_triangles() {
-        DList S(*this, DLIST_S_ID);
-
-        // Step 1: get triangles adjacent to the border
-        for(index_t t=0; t<nT(); ++t) {
-            if(
-                (Tadj(t,0) == index_t(-1)) ||
-                (Tadj(t,1) == index_t(-1)) ||
-                (Tadj(t,2) == index_t(-1))
-            ) {
-                Tset_flag(t, T_MARKED_FLAG);
-                if(
-                    (Tadj(t,0) == index_t(-1) && !Tedge_is_constrained(t,0)) ||
-                    (Tadj(t,1) == index_t(-1) && !Tedge_is_constrained(t,1)) ||
-                    (Tadj(t,2) == index_t(-1) && !Tedge_is_constrained(t,2))
-                ) {
-                    Tset_flag(t, T_REGION1_FLAG);
-                }
-                S.push_back(t);
-            }
-        }
-
-        // Step 2: recursive traversal
-        while(!S.empty()) {
-            index_t t1 = S.pop_back();
-            for(index_t le=0; le<3; ++le) {
-                index_t t2 = Tadj(t1,le); 
-                if(
-                    t2 != index_t(-1) &&
-                    !Tflag_is_set(t2,T_MARKED_FLAG)
-                ) {
-                    Tset_flag(t2, T_MARKED_FLAG);
-                    if(
-                        Tedge_is_constrained(t1,le) ^ 
-                        Tflag_is_set(t1, T_REGION1_FLAG)
-                    ) {
-                        Tset_flag(t2, T_REGION1_FLAG);
-                    }
-                    S.push_back(t2);
-                }
-            }
-        }
-
-        // Step 3: mark according to region
-        for(index_t t=0; t<nT(); ++t) {
-            if(!Tflag_is_set(t,T_REGION1_FLAG)) {
-                Treset_flag(t,T_MARKED_FLAG);
-            }
-        }
-        
-        // Step 4: remove marked triangles
-        remove_marked_triangles();
-    }
-
-
+    
     void CDTBase2d::remove_marked_triangles() {
         // Step 1: compute old2new map
         // (use Tnext_'s storage, that we do not need now)
@@ -1056,6 +1002,8 @@ namespace GEO {
                 if(segment_edge_intersect(v1,v2,t,le)) {
                     index_t w1 = Tv(t,(le+1)%3);
                     index_t w2 = Tv(t,(le+2)%3);
+                    geo_argused(w1);
+                    geo_argused(w2);
                     geo_assert(I.find(make_edge(w1,w2)) != I.end());
                 }
             }
