@@ -114,6 +114,11 @@ void st_niccc_write_polygon_indexed(
     uint8_t color, uint8_t nb_vertices, uint8_t* vertices
 );
 
+void st_niccc_write_polygon(
+    ST_NICCC_IO* io, 
+    uint8_t color, uint8_t nb_vertices, uint8_t* x, uint8_t* y
+);
+    
 void st_niccc_write_triangle_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t v1, uint8_t v2, uint8_t v3

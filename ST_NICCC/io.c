@@ -225,6 +225,18 @@ void st_niccc_write_polygon_indexed(
     }
 }
 
+void st_niccc_write_polygon(
+    ST_NICCC_IO* io, 
+    uint8_t color, uint8_t nb_vertices,
+    uint8_t* x, uint8_t* y
+) {
+    st_niccc_write_byte(io, nb_vertices | (color << 4));
+    for(int i=0; i<nb_vertices; ++i) {
+        st_niccc_write_byte(io, x[i]);
+        st_niccc_write_byte(io, y[i]);        
+    }
+}
+
 void st_niccc_write_triangle_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t v1, uint8_t v2, uint8_t v3
