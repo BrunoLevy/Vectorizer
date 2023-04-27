@@ -31,7 +31,7 @@ int main() {
         }
         st_niccc_write_frame(&io, &frame);
         for(int i=0; i<N; ++i) {
-            st_niccc_write_triangle(
+            st_niccc_write_triangle_indexed(
                 &io, (i&1)+1, 0, 1+i, 1+((i+1)%N)
             );
         }

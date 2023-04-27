@@ -771,11 +771,18 @@ namespace GEO {
         // Step 1: get triangles adjacent to the border
         for(index_t t=0; t<nT(); ++t) {
             if(
-                (!Tedge_is_constrained(t,0) && Tadj(t,0) == index_t(-1)) ||
-                (!Tedge_is_constrained(t,1) && Tadj(t,1) == index_t(-1)) ||
-                (!Tedge_is_constrained(t,2) && Tadj(t,2) == index_t(-1))
+                (Tadj(t,0) == index_t(-1)) ||
+                (Tadj(t,1) == index_t(-1)) ||
+                (Tadj(t,2) == index_t(-1))
             ) {
                 Tset_flag(t, T_MARKED_FLAG);
+                if(
+                    (Tadj(t,0) == index_t(-1) && !Tedge_is_constrained(t,0)) ||
+                    (Tadj(t,1) == index_t(-1) && !Tedge_is_constrained(t,1)) ||
+                    (Tadj(t,2) == index_t(-1) && !Tedge_is_constrained(t,2))
+                ) {
+                    Tset_flag(t, T_REGION1_FLAG);
+                }
                 S.push_back(t);
             }
         }
@@ -787,16 +794,28 @@ namespace GEO {
                 index_t t2 = Tadj(t1,le); 
                 if(
                     t2 != index_t(-1) &&
-                    !Tedge_is_constrained(t1,le) && 
                     !Tflag_is_set(t2,T_MARKED_FLAG)
                 ) {
                     Tset_flag(t2, T_MARKED_FLAG);
+                    if(
+                        Tedge_is_constrained(t1,le) ^ 
+                        Tflag_is_set(t1, T_REGION1_FLAG)
+                    ) {
+                        Tset_flag(t2, T_REGION1_FLAG);
+                    }
                     S.push_back(t2);
                 }
             }
         }
 
-        // Step 3: remove marked triangles
+        // Step 3: mark according to region
+        for(index_t t=0; t<nT(); ++t) {
+            if(!Tflag_is_set(t,T_REGION1_FLAG)) {
+                Treset_flag(t,T_MARKED_FLAG);
+            }
+        }
+        
+        // Step 4: remove marked triangles
         remove_marked_triangles();
     }
 
@@ -1294,6 +1313,16 @@ namespace GEO {
         for(index_t t=0; t<nT(); ++t) {
             out << "f " << Tv(t,0)+1 << " " << Tv(t,1)+1 << " " << Tv(t,2)+1
                 << std::endl;
+        }
+        for(index_t t=0; t<nT(); ++t) {
+            for(index_t le=0; le<3; ++le) {
+                if(Tedge_is_constrained(t,le)) {
+                    out << "l "
+                        << Tv(t, (le+1)%3)+1 << " "
+                        << Tv(t, (le+2)%3)+1
+                        << std::endl;
+                }
+            }
         }
     }
 }

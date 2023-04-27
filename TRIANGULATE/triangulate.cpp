@@ -18,6 +18,26 @@ std::string to_string(int i, int len) {
     return result;
 }
 
+bool constraint_is_degenerate(
+    const GEO::CDT2di& triangulation,
+    std::vector<GEO::index_t>& vertices
+) {
+    for(int i=0; i<vertices.size(); ++i) {
+        for(int j=i+1; j<vertices.size(); ++j) {
+            for(int k=j+1; k<vertices.size(); ++k) {
+                if(
+                    triangulation.orient2d(
+                        vertices[i], vertices[j], vertices[k]
+                    ) != GEO::ZERO
+                ) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+    
 // Parse .fig file
 // Reference: https://mcj.sourceforge.net/fig-format.html
 bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
@@ -40,6 +60,8 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
     std::cerr << "Loading " << filename << std::endl;
     int nb_paths = 0;
 
+    // Read xfig file and send contents to constrained Delaunay
+    // triangulation
     try {
         std::string line;
         while(std::getline(in,line)) {
@@ -65,7 +87,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
 
             int xmin_tmp, ymin_tmp, xmax_tmp, ymax_tmp;
             
-            if(
+            if( // object 3: polyline
                 sscanf(
                     line.c_str(),
                     "%d %d %d %d %d %d %d %d %d %f %d %d %d %d",
@@ -94,13 +116,19 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                     y = (y-ymin)*255/L;
                     vertices.push_back(triangulation.insert(GEO::vec2ih(x,y)));
                 }
-                for(int i=0; i<npoints; ++i) {
-                    triangulation.insert_constraint(
-                        vertices[i], vertices[(i+1)%npoints]
-                    );
+                
+                // If all vertices on constraint are aligned, then
+                // ignore the constraint, because it would break the
+                // in/out rule.
+                if(!constraint_is_degenerate(triangulation, vertices)) {
+                    for(int i=0; i<npoints; ++i) {
+                        triangulation.insert_constraint(
+                            vertices[i], vertices[(i+1)%npoints]
+                        );
+                    }
                 }
                 ++nb_paths;
-            } else if(
+            } else if( // object 6: bounding box
                 sscanf(
                     line.c_str(),
                     "%d %d %d %d %d",
@@ -115,13 +143,21 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                 L = xmax - xmin;
             }
         }
-        triangulation.remove_external_triangles();
         triangulation.save(filename+"_triangulation.obj");
+        triangulation.remove_external_triangles();
+        /*
         if(triangulation.nv() > 255) {
             throw(std::logic_error("Too many vertices in frame"));
         }
+        */
     } catch(const std::logic_error& e) {
+        // I still have a problem with intersecting constraint for
+        // integer coordinates (to be fixed).
+        // We also have a problem when number of points is greater
+        // than 255 (cannot be stored in ST_NICCC file). Well, in
+        // fact we could use "direct" mode in that case (TODO...)
         std::cerr << "Exception caught: " << e.what() << std::endl;
+        
         // If there was a problem, create an empty frame
         ST_NICCC_FRAME frame;
         st_niccc_frame_init(&frame);
@@ -130,21 +166,36 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         return true;
     }
 
-
-
+    // Write data to ST_NICCC file
     ST_NICCC_FRAME frame;
     st_niccc_frame_init(&frame);
     st_niccc_frame_clear(&frame);
-    for(GEO::index_t v=0; v<triangulation.nv(); ++v) {
-        int x = (triangulation.point(v).x / triangulation.point(v).w);
-        int y = (triangulation.point(v).y / triangulation.point(v).w);        
-        st_niccc_frame_set_vertex(&frame, v, x, y);
-    }
-    st_niccc_write_frame(io,&frame);    
-    for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-        st_niccc_write_triangle(
-            io,1,triangulation.Tv(t,0),triangulation.Tv(t,1),triangulation.Tv(t,2)
-        );
+    if(triangulation.nv() <= 255) {
+        for(GEO::index_t v=0; v<triangulation.nv(); ++v) {
+            int x = (triangulation.point(v).x / triangulation.point(v).w);
+            int y = (triangulation.point(v).y / triangulation.point(v).w);        
+            st_niccc_frame_set_vertex(&frame, v, x, y);
+        }
+        st_niccc_write_frame(io,&frame);    
+        for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
+            st_niccc_write_triangle_indexed(
+                io,1,triangulation.Tv(t,0),triangulation.Tv(t,1),triangulation.Tv(t,2)
+            );
+        }
+    } else {
+        st_niccc_write_frame(io,&frame);
+        for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
+            int x[3];
+            int y[3];
+            for(int lv=0; lv<3; ++lv) {
+                GEO::index_t v = triangulation.Tv(t,lv);
+                x[lv] = (triangulation.point(v).x / triangulation.point(v).w);
+                y[lv] = (triangulation.point(v).y / triangulation.point(v).w);
+            }
+            st_niccc_write_triangle(
+                io,1,x[0],y[0],x[1],y[1],x[2],y[2]
+            );
+        }
     }
     st_niccc_write_end_of_frame(io);
     

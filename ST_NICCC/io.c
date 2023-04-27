@@ -210,7 +210,7 @@ void st_niccc_write_frame(
     }
 }
 
-void st_niccc_write_polygon(
+void st_niccc_write_polygon_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t nb_vertices, uint8_t* vertices
 ) {
@@ -220,12 +220,29 @@ void st_niccc_write_polygon(
     }
 }
 
-void st_niccc_write_triangle(
+void st_niccc_write_triangle_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t v1, uint8_t v2, uint8_t v3
 ) {
     uint8_t v[3] = { v1, v2, v3 };
-    st_niccc_write_polygon(io, color, 3, v);
+    st_niccc_write_polygon_indexed(io, color, 3, v);
+}
+
+void st_niccc_write_triangle(
+    ST_NICCC_IO* io, 
+    uint8_t color,
+    uint8_t x1, uint8_t y1,
+    uint8_t x2, uint8_t y2,
+    uint8_t x3, uint8_t y3
+) {
+    int nb_vertices = 3;
+    st_niccc_write_byte(io, nb_vertices | (color << 4));
+    st_niccc_write_byte(io, x1);
+    st_niccc_write_byte(io, y1);
+    st_niccc_write_byte(io, x2);
+    st_niccc_write_byte(io, y2);
+    st_niccc_write_byte(io, x3);
+    st_niccc_write_byte(io, y3);
 }
 
 void st_niccc_write_end_of_frame(ST_NICCC_IO* io) {

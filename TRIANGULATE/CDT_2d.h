@@ -296,8 +296,7 @@ namespace GEO {
          */
         enum {
             T_MARKED_FLAG  = DLIST_NB,   /**< marked triangle */
-            T_REGION1_FLAG = DLIST_NB+1,
-            T_REGION2_FLAG = DLIST_NB+2
+            T_REGION1_FLAG = DLIST_NB+1
         };
 
         /**
@@ -1318,7 +1317,7 @@ namespace GEO {
             return point_[v];
         }
 
-    protected:
+    public:
         /**
          * \copydoc CDTBase2d::orient_2d()
          */

@@ -109,16 +109,24 @@ void st_niccc_write_end_of_frame(ST_NICCC_IO* io);
 
 void st_niccc_write_end_of_stream(ST_NICCC_IO* io);
 
-void st_niccc_write_polygon(
+void st_niccc_write_polygon_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t nb_vertices, uint8_t* vertices
 );
 
-void st_niccc_write_triangle(
+void st_niccc_write_triangle_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t v1, uint8_t v2, uint8_t v3
 );
 
+void st_niccc_write_triangle(
+    ST_NICCC_IO* io, 
+    uint8_t color,
+    uint8_t x1, uint8_t y1,
+    uint8_t x2, uint8_t y2,
+    uint8_t x3, uint8_t y3
+);
+    
 
 /*******************************************************************/
 
