@@ -33,9 +33,9 @@ int main(int argc, char** argv) {
             while(st_niccc_read_polygon(&io,&frame,&polygon)) {
                 uint8_t color = polygon.color;
                 gfx_setcolor(
-                    frame.cmap_r[color],
-                    frame.cmap_g[color],
-                    frame.cmap_b[color]
+                    gfx_wireframe ? 255 : frame.cmap_r[color],
+                    gfx_wireframe ? 255 : frame.cmap_g[color],
+                    gfx_wireframe ? 255 : frame.cmap_b[color]
                 );
                 gfx_fillpoly(
                     polygon.nb_vertices,
