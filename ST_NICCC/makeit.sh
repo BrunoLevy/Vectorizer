@@ -16,7 +16,7 @@ else
   echo "   Using cached scene1.bin"
 fi
 
-CFLAGS="-Wall -Wpedantic"
+CFLAGS="-Wall -Wpedantic -g"
 
 gcc $CFLAGS -DGFX_BACKEND_GLFW ST_NICCC.c graphics.c io.c -lglfw -lGL -o ST_NICCC_glfw
 gcc $CFLAGS -DGFX_BACKEND_ANSI ST_NICCC.c graphics.c io.c -o ST_NICCC_console

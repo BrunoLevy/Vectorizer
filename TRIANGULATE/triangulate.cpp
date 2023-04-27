@@ -6,7 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-
+#include <cmath>
 
 /**
  * \brief Generates a string of length \p len from integer \p i
@@ -101,9 +101,31 @@ namespace GEO {
             }
         }
 
+        /*
+        double area_black = 0.0;
+        double area_white = 0.0;
+        for(index_t t=0; t<T.nT(); ++t) {
+            double x[3];
+            double y[3];
+            for(index_t lv=0; lv<3; ++lv) {
+                index_t v = T.Tv(t,lv);
+                x[lv] = double(T.point(v).x) / double(T.point(v).w);
+                y[lv] = double(T.point(v).y) / double(T.point(v).w);
+            }
+            double At = fabs((x[1]-x[0]*y[2]-y[0])-(x[2]-x[0]*y[1]-y[0]));
+            if(T.Tflag_is_set(t,CDT2di::T_REGION1_FLAG)) {
+                area_black += At;
+            } else {
+                area_white += At;                
+            }
+        }
+        bool inverted = (area_white > area_black);
+        */
+
+        bool inverted = false;
         // Step 3: mark triangles to be discarded
         for(index_t t=0; t<T.nT(); ++t) {
-            if(T.Tflag_is_set(t,CDT2di::T_REGION1_FLAG)) {
+            if(inverted ^ T.Tflag_is_set(t,CDT2di::T_REGION1_FLAG)) {
                 T.Tset_flag(t, CDT2di::T_MARKED_FLAG);
             } else {
                 T.Treset_flag(t, CDT2di::T_MARKED_FLAG);
@@ -112,6 +134,66 @@ namespace GEO {
 
         // Step 4: remove marked triangles
         T.remove_marked_triangles();
+    }
+
+    void get_convex_polygon(
+        CDT2di& T, index_t t, std::vector<GEO::index_t>& P
+    ) {
+        P.resize(0);
+        P.push_back(T.Tv(t,0));
+        P.push_back(T.Tv(t,1));
+        P.push_back(T.Tv(t,2));
+        CDT2di::DList S(T, CDT2di::DLIST_S_ID);
+        T.Tset_flag(t, CDT2di::T_MARKED_FLAG);
+        S.push_back(t);
+
+        while(!S.empty() && P.size()<15) {
+            index_t t1 = S.front();
+            S.pop_front();
+            for(index_t le1=0; (le1<3 && P.size()<15); ++le1) {
+                index_t t2 = T.Tadj(t1,le1);
+                if(
+                    t2 == index_t(-1) ||
+                    T.Tflag_is_set(t2,CDT2di::T_MARKED_FLAG)) {
+                    continue;
+                }
+                index_t le2 = T.Tadj_find(t2,t1);
+                index_t v1 = T.Tv(t1,(le1+1)%3);
+                index_t v2 = T.Tv(t1,(le1+2)%3);                
+                index_t v3 = T.Tv(t2,le2);
+
+                if(false) {
+                    std::cerr << "v1=" << v1 << " v2=" << v2 << " v3=" << v3 << std::endl;
+                    std::cerr << "P=[";
+                    for(index_t i=0; i<P.size(); ++i) {
+                        std::cerr << P[i] << " ";
+                    }
+                    std::cerr << "]" << std::endl;
+                }
+                
+                index_t i1 = index_t(
+                    std::find(P.begin(), P.end(), v1)-P.begin()
+                );
+                assert(i1 < P.size());
+                index_t i2 = index_t(
+                    std::find(P.begin(), P.end(), v2)-P.begin()
+                );
+                assert(i2 < P.size());
+                assert((i1+1)%P.size() == i2);
+
+                index_t i1_prev = (i1+P.size()-1)%P.size();
+                index_t i2_next = (i2+1)%P.size();
+
+                if(
+                    T.orient2d(P[i1_prev],P[i1],v3) >= 0 &&
+                    T.orient2d(v3,P[i2],P[i2_next]) >= 0 
+                ) {
+                    T.Tset_flag(t2,CDT2di::T_MARKED_FLAG);
+                    S.push_back(t2);
+                    P.insert(P.begin()+i2,v3);
+                }
+            }
+        }
     }
 }
 
@@ -247,6 +329,23 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
             st_niccc_frame_set_vertex(&frame, v, x, y);
         }
         st_niccc_write_frame(io,&frame);
+
+        {
+            std::vector<GEO::index_t> P;
+            uint8_t P8[15];
+            for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
+                if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
+                    get_convex_polygon(triangulation, t, P);
+                    for(int i=0; i<int(P.size()); ++i) {
+                        P8[i] = uint8_t(P[i]);
+                    }
+                    st_niccc_write_polygon_indexed(
+                        io,1,P.size(),P8
+                    );
+                }
+            }
+        }
+        /*
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
             st_niccc_write_triangle_indexed(
                 io,1,
@@ -255,11 +354,31 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                 triangulation.Tv(t,2)
             );
         }
+        */
     } else {
         st_niccc_write_frame(io,&frame);
+        uint8_t x[15];
+        uint8_t y[15];
+
+        {
+            std::vector<GEO::index_t> P;
+            for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
+                if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
+                    get_convex_polygon(triangulation, t, P);
+                    for(int i=0; i<int(P.size()); ++i) {
+                        GEO::index_t v = P[i];
+                        x[i] = uint8_t(triangulation.point(v).x / triangulation.point(v).w);
+                        y[i] = uint8_t(triangulation.point(v).y / triangulation.point(v).w);
+                    }
+                    st_niccc_write_polygon(
+                        io,1,P.size(),x,y
+                    );
+                }
+            }
+        }
+        
+        /*
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-            int x[3];
-            int y[3];
             for(int lv=0; lv<3; ++lv) {
                 GEO::index_t v = triangulation.Tv(t,lv);
                 x[lv] = (triangulation.point(v).x / triangulation.point(v).w);
@@ -269,6 +388,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                 io,1,x[0],y[0],x[1],y[1],x[2],y[2]
             );
         }
+        */
     }
     st_niccc_write_end_of_frame(io);
     

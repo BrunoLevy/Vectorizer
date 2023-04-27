@@ -5,6 +5,7 @@
 #include "graphics.h"
 #include "io.h"
 #include <stdlib.h>
+#include <string.h>
 
 ST_NICCC_IO io;
 ST_NICCC_FRAME frame;
@@ -12,7 +13,7 @@ ST_NICCC_POLYGON polygon;
 
 int main(int argc, char** argv) {
     const char* scene_file = "scene1.bin";
-    if(argc == 2) {
+    if(argc >= 2) {
         scene_file = argv[1];
     }
     if(!st_niccc_open(&io,scene_file,ST_NICCC_READ)) {
@@ -20,6 +21,9 @@ int main(int argc, char** argv) {
         exit(-1);
     }
     gfx_init();
+    if(argc >= 3) {
+        gfx_wireframe=!strcmp(argv[2],"-wireframe");
+    }
     for(;;) {
         st_niccc_rewind(&io);
 	while(st_niccc_read_frame(&io,&frame)) {

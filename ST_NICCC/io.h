@@ -75,7 +75,7 @@ typedef struct {
 typedef struct {
     uint8_t nb_vertices;
     uint8_t color;
-    int XY[30]; // interleaved x,y
+    int XY[32]; // interleaved x,y
 } ST_NICCC_POLYGON;
 
 int st_niccc_read_frame(

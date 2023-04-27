@@ -7,8 +7,8 @@ VIDEOSOURCE=https://ia802905.us.archive.org/19/items/TouhouBadApple/Touhou%20-%2
 #FPS=5
 #RESOLUTION=256
 
-FPS=24
-RESOLUTION=256
+FPS=12
+RESOLUTION=128
 
 ####################################################################
 

@@ -1,5 +1,6 @@
 #include "io.h"
 #include <stdlib.h>
+#include <assert.h>
 
 int st_niccc_open(
     ST_NICCC_IO* io, const char* filename, int mode
@@ -33,10 +34,18 @@ uint8_t st_niccc_read_byte(ST_NICCC_IO* io){
    if(io->word_addr != io->addr >> 2) {
        io->word_addr = io->addr >> 2;
        fseek(io->f, io->word_addr*4, SEEK_SET);
-       size_t result = fread(&(io->u.word), 4, 1, io->f);
-       if(result != 1) {
-           fprintf(stderr,"ST_NICCC: read error\n");
-           exit(-1);
+       size_t nb_read = fread(&(io->u.word), 4, 1, io->f);
+       if(nb_read != 1) {
+           // TODO:
+           // Seems that sometimes I got an error, this
+           // appeared when I started to merge triangles
+           // into polygons (for now, ignored, so that
+           // player can loop)
+           //
+           // fprintf(stderr,"ST_NICCC: read error\n");
+           // abort();
+           // exit(-1);
+           return END_OF_STREAM;
        }
    }
    result = io->u.bytes[(io->addr)&3];
@@ -219,6 +228,7 @@ void st_niccc_write_polygon_indexed(
     ST_NICCC_IO* io, 
     uint8_t color, uint8_t nb_vertices, uint8_t* vertices
 ) {
+    assert(nb_vertices <= 15);
     st_niccc_write_byte(io, nb_vertices | (color << 4));
     for(int i=0; i<nb_vertices; ++i) {
         st_niccc_write_byte(io, vertices[i]);
@@ -230,6 +240,7 @@ void st_niccc_write_polygon(
     uint8_t color, uint8_t nb_vertices,
     uint8_t* x, uint8_t* y
 ) {
+    assert(nb_vertices <= 15);    
     st_niccc_write_byte(io, nb_vertices | (color << 4));
     for(int i=0; i<nb_vertices; ++i) {
         st_niccc_write_byte(io, x[i]);
