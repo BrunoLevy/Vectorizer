@@ -369,71 +369,43 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         }
         st_niccc_write_frame(io,&frame);
 
-        {
-            std::vector<GEO::index_t> P;
-            uint8_t P8[15];
-            for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-                if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
-                    uint8_t color = triangulation.Tflag_is_set(
-                        t,GEO::CDT2di::T_REGION1_FLAG
-                    ) ? 0 : 1;
-                    get_convex_polygon(triangulation, t, P);
-                    for(int i=0; i<int(P.size()); ++i) {
-                        P8[i] = uint8_t(P[i]);
-                    }
-                    st_niccc_write_polygon_indexed(
-                        io,color,P.size(),P8
-                    );
+        std::vector<GEO::index_t> P;
+        uint8_t P8[15];
+        for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
+            if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
+                uint8_t color = triangulation.Tflag_is_set(
+                    t,GEO::CDT2di::T_REGION1_FLAG
+                ) ? 0 : 1;
+                get_convex_polygon(triangulation, t, P);
+                for(int i=0; i<int(P.size()); ++i) {
+                    P8[i] = uint8_t(P[i]);
                 }
+                st_niccc_write_polygon_indexed(
+                    io,color,P.size(),P8
+                );
             }
         }
-        /*
-        for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-            st_niccc_write_triangle_indexed(
-                io,1,
-                triangulation.Tv(t,0),
-                triangulation.Tv(t,1),
-                triangulation.Tv(t,2)
-            );
-        }
-        */
     } else {
         st_niccc_write_frame(io,&frame);
         uint8_t x[15];
         uint8_t y[15];
-
-        {
-            std::vector<GEO::index_t> P;
-            for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-                if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
-                    uint8_t color = triangulation.Tflag_is_set(
-                        t,GEO::CDT2di::T_REGION1_FLAG
-                    ) ? 0 : 1;
-                    get_convex_polygon(triangulation, t, P);
-                    for(int i=0; i<int(P.size()); ++i) {
-                        GEO::index_t v = P[i];
-                        x[i] = uint8_t(triangulation.point(v).x / triangulation.point(v).w);
-                        y[i] = uint8_t(triangulation.point(v).y / triangulation.point(v).w);
-                    }
-                    st_niccc_write_polygon(
-                        io,color,P.size(),x,y
-                    );
-                }
-            }
-        }
-        
-        /*
+        std::vector<GEO::index_t> P;
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-            for(int lv=0; lv<3; ++lv) {
-                GEO::index_t v = triangulation.Tv(t,lv);
-                x[lv] = (triangulation.point(v).x / triangulation.point(v).w);
-                y[lv] = (triangulation.point(v).y / triangulation.point(v).w);
+            if(!triangulation.Tflag_is_set(t,GEO::CDT2di::T_MARKED_FLAG)) {
+                uint8_t color = triangulation.Tflag_is_set(
+                    t,GEO::CDT2di::T_REGION1_FLAG
+                ) ? 0 : 1;
+                get_convex_polygon(triangulation, t, P);
+                for(int i=0; i<int(P.size()); ++i) {
+                    GEO::index_t v = P[i];
+                    x[i] = uint8_t(triangulation.point(v).x / triangulation.point(v).w);
+                    y[i] = uint8_t(triangulation.point(v).y / triangulation.point(v).w);
+                }
+                st_niccc_write_polygon(
+                    io,color,P.size(),x,y
+                );
             }
-            st_niccc_write_triangle(
-                io,1,x[0],y[0],x[1],y[1],x[2],y[2]
-            );
         }
-        */
     }
     st_niccc_write_end_of_frame(io);
     
