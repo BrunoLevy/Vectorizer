@@ -4,11 +4,13 @@
 # License: BSD 3 clauses
 
 VIDEOSOURCE=https://ia802905.us.archive.org/19/items/TouhouBadApple/Touhou%20-%20Bad%20Apple.mp4
+INPUT_VIDEOFILE=VIDEO/video.mp4
 #FPS=5
 #RESOLUTION=256
 
 FPS=12
 RESOLUTION=128
+NB_COLORS=2
 
 ####################################################################
 
@@ -81,31 +83,156 @@ fig2movetolineto() {
 
 ####################################################################
 
-mkdir -p VIDEO FRAMES PATHS
-
-# Step 1: download video
-echo "$0: [1] downloading video..."
-if [ ! -f VIDEO/video.mp4 ]; then
-  wget $VIDEOSOURCE -O VIDEO/video.mp4
-else
-  echo "   Using cached VIDEO/video.mp4"
-fi
-
-# Step 2: extract frames
-echo "$0: [2] extracting frames..."
-rm -f FRAMES/*
-ffmpeg -i VIDEO/video.mp4 -vf fps=$FPS,scale=$RESOLUTION:-2,setsar=1:1 FRAMES/frame%04d.pgm
-
-# Step 3: trace frames
-echo "$0: [3] tracing frames..."
-rm -f PATHS/*
-for frame in `ls FRAMES/*.pgm`
-do
-   BASEFRAME=`basename $frame .pgm`
-   FIGFRAME=PATHS/$BASEFRAME.fig
-   OBJFRAME=PATHS/$BASEFRAME.obj
-   VECTORFRAME=PATHS/$BASEFRAME.vec
-   potrace -b xfig -a 0 -O 20.0 -r 146x146 $frame -o $FIGFRAME
+vectorize_BW() {
+   BASENAME=`basename $1 .pgm`
+   FIGFRAME=PATHS/$BASENAME.fig
+   OBJFRAME=PATHS/$BASENAME.obj
+   VECTORFRAME=PATHS/$BASENAME.vec
+   potrace -b xfig -a 0 -O 20.0 -r 146x146 $1 -o $FIGFRAME
    fig2obj $FIGFRAME $OBJFRAME
    fig2movetolineto $FIGFRAME $VECTORFRAME
+}
+    
+####################################################################
+
+# range from to
+# prints the range of numbers from from+1 ... to
+range() {
+   echo | awk "BEGIN{ from=$1; to=$2}"' {
+      for(i=from; i<=to; i++) {
+         printf("%d ",i)
+      }
+   }'
+}
+
+# select_color colormap nb_colors entry
+# prints the imagemagic command option to select a given color in an image
+select_color() {
+   echo "$COLORMAP" | awk "BEGIN{ nb=$1; entry=$2}"' {
+       for(i=0; i<nb; i++) {
+           if(i<entry) printf("-fill \"#ffffff\""); else printf("-fill \"#000001\"");
+	   e=(nb-1-i)*3+1
+           printf(" -opaque \"#%06x\"\n",$(e+2)+$(e+1)*256+$e*256*256)
+       }
+  }'
+}
+
+vectorize_color() {
+    BASENAME=`basename $1 .ppm`
+    BASEFRAME=FRAMES/$BASENAME
+    convert $1 -filter lanczos -resize 200% $BASEFRAME"_scaled.png"
+    pngquant --nofs --force  $NB_COLORS $BASEFRAME"_scaled.png" -o $BASEFRAME"_reduced.png"
+    COLORMAP=`convert $BASEFRAME"_reduced.png" -unique-colors -compress none ppm:- | sed -n '4p'`
+    for i in `range 0 $NB_COLORS`
+    do
+        cmd="convert "$BASEFRAME"_reduced.png "`select_color $NB_COLORS $i`" "$BASEFRAME"_"$i"_isolated.png"
+        eval $cmd
+        cmd="convert "$BASEFRAME"_"$i"_isolated.png -fill \"#FFFFFF\" -opaque \"#FFFFFF\" -fill \"#000000\" -opaque \"#000001\" "$BASEFRAME"_"$i"_layer.ppm"
+        eval $cmd
+        potrace -b xfig -a 0 -O 20.0 -r 146x146 $BASEFRAME"_"$i"_layer.ppm" -o PATHS/$BASENAME"_"$i"_layer".fig
+        fig2obj PATHS/$BASENAME"_"$i"_layer".fig PATHS/$BASENAME"_"$i"_layer".obj
+    done
+}
+
+####################################################################
+
+while [ -n "$1" ]; do
+    case "$1" in
+        -fps)
+            shift
+            FPS=$1
+            shift
+            ;;
+        -r | -resolution )
+            shift
+            RESOLUTION=$1
+            shift
+            ;;
+        -nc | -nb_colors)
+            shift
+            NB_COLORS=$1
+            shift
+            ;;
+        -i | -input)
+            shift
+            INPUT_VIDEOFILE=$1
+            shift
+            ;;
+        -h | -help | --help)
+            cat <<EOF
+NAME
+    vectorize.sh
+
+SYNOPSIS
+    vectorizes a video
+
+USAGE
+    vectorize.sh [options] 
+
+OPTIONS
+
+    -h,-help,--help
+        Prints this page.
+
+    -fps nnn
+        Frames per second. Default=12
+
+    -r,-resolution  nnn
+        Internal resolution for vectorizing. Default=256
+    
+    -nc,-nb_colors nnn
+        Number of colors. Default=2 (black and white)
+
+    -i,-input videofile.mp4        
+
+    --build_name_suffix=suffix-dir
+        Add a suffix to define the build directory
+
+PLATFORM
+    Build platforms supported by Graphite: use configure.sh --help-platforms
+EOF
+            exit
+            ;;
+        *)
+            echo "Error: unrecognized option: $1"
+            exit
+            ;;
+    esac
 done
+
+####################################################################
+
+mkdir -p VIDEO FRAMES PATHS
+
+# Download video
+#echo "$0: [step 0] downloading video..."
+#if [ ! -f VIDEO/video.mp4 ]; then
+#  wget $VIDEOSOURCE -O VIDEO/video.mp4
+#else
+#  echo "   Using cached VIDEO/video.mp4"
+#fi
+
+# Step 1: extract frames
+echo "$0: [step 1] extracting frames..."
+rm -f FRAMES/*
+if [[ "$NB_COLORS" -lt 3 ]]; then
+   ffmpeg -i $INPUT_VIDEOFILE -vf fps=$FPS,scale=$RESOLUTION:-2,setsar=1:1 FRAMES/frame%04d.pgm
+else
+   ffmpeg -i $INPUT_VIDEOFILE -vf fps=$FPS,scale=$RESOLUTION:-2,setsar=1:1 FRAMES/frame%04d.ppm
+fi
+
+# Step 2: trace frames
+echo "$0: [step 2] tracing frames..."
+rm -f PATHS/*
+if [[ "$NB_COLORS" -lt 3 ]]; then
+    for frame in `ls FRAMES/*.pgm`
+    do
+        vectorize_BW $frame        
+    done
+else
+    for frame in `ls FRAMES/*.ppm`
+    do
+        vectorize_color $frame        
+    done
+fi
+
