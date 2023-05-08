@@ -47,7 +47,7 @@ namespace GEO {
         vec2ih() {
         }
         vec2ih(
-            int x_in, int y_in
+            int64_t x_in, int64_t y_in
         ) : x(x_in), y(y_in), w(1) {
         }
         vec2ih(
@@ -99,7 +99,7 @@ namespace GEO {
          * \param[in] i , j the indices of the two vertices
          *  of the constrained segment
          */
-        void insert_constraint(index_t i, index_t j);
+        virtual void insert_constraint(index_t i, index_t j);
 
         /**
          * \brief Removes all the triangles that have the flag T_MARKED_FLAG
@@ -1297,6 +1297,11 @@ namespace GEO {
         }
 
         /**
+         * \copydoc CDT2d::insert_constraint()
+         */
+        void insert_constraint(index_t i, index_t j) override;
+        
+        /**
          * \copydoc CDTBase2d::save()
          */
         void save(const std::string& filename) const override;
@@ -1332,6 +1337,7 @@ namespace GEO {
         
     protected:
         vector<vec2ih> point_;
+        vector< std::pair<index_t, index_t> > constraint_;
     };
 
     /*****************************************************************/    

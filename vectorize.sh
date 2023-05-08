@@ -10,6 +10,7 @@ INPUT_VIDEOFILE=VIDEO/video.mp4
 
 FPS=12
 RESOLUTION=128
+TOLERANCE=20.0
 NB_COLORS=2
 
 ####################################################################
@@ -88,7 +89,7 @@ vectorize_BW() {
    FIGFRAME=PATHS/$BASENAME.fig
    OBJFRAME=PATHS/$BASENAME.obj
    VECTORFRAME=PATHS/$BASENAME.vec
-   potrace -b xfig -a 0 -O 20.0 -r 146x146 $1 -o $FIGFRAME
+   potrace -b xfig -a 0 -O $TOLERANCE -r $RESOLUTION"x"$RESOLUTION $1 -o $FIGFRAME
    fig2obj $FIGFRAME $OBJFRAME
    fig2movetolineto $FIGFRAME $VECTORFRAME
 }
@@ -129,7 +130,7 @@ vectorize_color() {
         eval $cmd
         cmd="convert "$BASEFRAME"_"$i"_isolated.png -fill \"#FFFFFF\" -opaque \"#FFFFFF\" -fill \"#000000\" -opaque \"#000001\" "$BASEFRAME"_"$i"_layer.ppm"
         eval $cmd
-        potrace -b xfig -a 0 -O 20.0 -r 146x146 $BASEFRAME"_"$i"_layer.ppm" -o PATHS/$BASENAME"_"$i"_layer".fig
+        potrace -b xfig -a 0 -O $TOLERANCE -r $RESOLUTION"x"$RESOLUTION $BASEFRAME"_"$i"_layer.ppm" -o PATHS/$BASENAME"_"$i"_layer".fig
         fig2obj PATHS/$BASENAME"_"$i"_layer".fig PATHS/$BASENAME"_"$i"_layer".obj
     done
 }
@@ -151,6 +152,11 @@ while [ -n "$1" ]; do
         -nc | -nb_colors)
             shift
             NB_COLORS=$1
+            shift
+            ;;
+        -O | -tolerance)
+            shift
+            TOLERANCE=$1
             shift
             ;;
         -i | -input)
@@ -178,18 +184,16 @@ OPTIONS
         Frames per second. Default=12
 
     -r,-resolution  nnn
-        Internal resolution for vectorizing. Default=256
+        Internal resolution for vectorizing. Default=128
     
     -nc,-nb_colors nnn
         Number of colors. Default=2 (black and white)
 
+    -O,-tolerance
+        5.0 and above for allowing to simplify the result.
+	Default is 20.0. potrace's default is 0.2
+
     -i,-input videofile.mp4        
-
-    --build_name_suffix=suffix-dir
-        Add a suffix to define the build directory
-
-PLATFORM
-    Build platforms supported by Graphite: use configure.sh --help-platforms
 EOF
             exit
             ;;

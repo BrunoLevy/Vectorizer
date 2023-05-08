@@ -182,7 +182,9 @@ namespace GEO {
                 index_t v3 = T.Tv(t2,le2);
 
                 if(false) {
-                    std::cerr << "v1=" << v1 << " v2=" << v2 << " v3=" << v3 << std::endl;
+                    std::cerr << "v1=" << v1
+                              << " v2=" << v2
+                              << " v3=" << v3 << std::endl;
                     std::cerr << "P=[";
                     for(index_t i=0; i<P.size(); ++i) {
                         std::cerr << P[i] << " ";

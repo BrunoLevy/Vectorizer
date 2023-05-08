@@ -85,16 +85,19 @@
 #endif
 
 namespace {
-    inline int64_t det2x2(
-        int64_t a11, int64_t a12, int64_t a21, int64_t a22
+
+    template <class T> 
+    inline T det2x2(
+        T a11, T a12, T a21, T a22
     ) {
         return a11*a22-a12*a21 ;
     }
 
-    inline int64_t det3x3(
-        int64_t a11, int64_t a12, int64_t a13,                
-        int64_t a21, int64_t a22, int64_t a23,                
-        int64_t a31, int64_t a32, int64_t a33
+    template <class T>
+    inline T det3x3(
+        T a11, T a12, T a13,                
+        T a21, T a22, T a23,                
+        T a31, T a32, T a33
     ) {
     return
          a11*det2x2(a22,a23,a32,a33)   
@@ -136,10 +139,19 @@ namespace GEO {
     }
 
 
-    inline Sign geo_sgn(int64_t x) {
-        return (x > 0) ? POSITIVE : (
-            (x < 0) ? NEGATIVE : ZERO
+    template <class T>
+    inline Sign geo_sgn(T x) {
+        return (x > T(0)) ? POSITIVE : (
+            (x < T(0)) ? NEGATIVE : ZERO
         );
+    }
+
+    std::ostream& operator<<(std::ostream& out, const vec2ih& p) {
+        // return out << "(" << p.x << "," << p.y << "," << p.w << ")" << " = ("
+        // << double(p.x)/double(p.w) << "," << double(p.y)/double(p.w) << ")" ;
+        out << double(p.x)/double(p.w) << " " << double(p.y)/double(p.w) << std::endl;
+        out << "#   " << p.x << " " << p.y << " " << p.w;
+        return out;
     }
 }
 
@@ -1116,9 +1128,15 @@ namespace GEO {
     /********************************************************************/
 
     CDT2di::CDT2di() {
+        exact_incircle_ = false;
     }
     
     CDT2di::~CDT2di() {
+    }
+
+    void CDT2di::insert_constraint(index_t i, index_t j) {
+        constraint_.push_back(std::make_pair(i,j));
+        CDTBase2d::insert_constraint(i,j);
     }
     
     void CDT2di::clear() {
@@ -1177,6 +1195,39 @@ namespace GEO {
         geo_debug_assert(j < nv());
         geo_debug_assert(k < nv());
         geo_debug_assert(l < nv());
+
+        double Ux = double(point_[i].x)/double(point_[i].w) -
+                    double(point_[l].x)/double(point_[l].w);
+
+        double Uy = double(point_[i].y)/double(point_[i].w) -
+                    double(point_[l].y)/double(point_[l].w);
+
+        double Vx = double(point_[j].x)/double(point_[j].w) -
+                    double(point_[l].x)/double(point_[l].w);
+
+        double Vy = double(point_[j].y)/double(point_[j].w) -
+                    double(point_[l].y)/double(point_[l].w);
+
+        double Wx = double(point_[k].x)/double(point_[k].w) -
+                    double(point_[l].x)/double(point_[l].w);
+
+        double Wy = double(point_[k].y)/double(point_[k].w) -
+                    double(point_[l].y)/double(point_[l].w);
+        
+        double lU = Ux*Ux+Uy*Uy;
+        double lV = Vx*Vx+Vy*Vy;
+        double lW = Wx*Wx+Wy*Wy;
+
+        return Sign(
+            geo_sgn(det3x3(
+                Ux, Uy, lU,
+                Vx, Vy, lV,
+                Wx, Wy, lW
+            )) 
+        );
+        
+        
+        /*
         vec2ih U = point_[i]-point_[l];
         vec2ih V = point_[j]-point_[l];
         vec2ih W = point_[k]-point_[l];
@@ -1190,6 +1241,7 @@ namespace GEO {
                 W.w*W.x, W.w*W.y, lW
             )) 
         );
+        */
     }
 
     index_t CDT2di::create_intersection(
@@ -1205,16 +1257,26 @@ namespace GEO {
         geo_debug_assert(E1 < ncnstr());
         geo_debug_assert(E2 < ncnstr());
         
+        i = constraint_[E1].first;
+        j = constraint_[E1].second;
+        k = constraint_[E2].first;
+        l = constraint_[E2].second;
+
         const vec2ih& p1 = point_[i];
         const vec2ih& p2 = point_[j];
         const vec2ih& q1 = point_[k];
         const vec2ih& q2 = point_[l];        
+
+        std::cerr << "P1 = " << p1 << std::endl;
+        std::cerr << "P2 = " << p2 << std::endl;
+        std::cerr << "Q1 = " << q1 << std::endl;
+        std::cerr << "Q2 = " << q2 << std::endl;        
         
         vec2ih U = p2-p1;
         vec2ih V = q2-q1;
         vec2ih D = q1-p1;
-
-        int64_t t_num   =  det2x2(D.x,D.y,V.x,V.y)*V.w;
+        
+        int64_t t_num   =  det2x2(D.x,D.y,V.x,V.y)*U.w;
         int64_t t_denom =  det2x2(U.x,U.y,V.x,V.y)*D.w;
 
         vec2ih I;
@@ -1225,24 +1287,93 @@ namespace GEO {
                 t_denom * p1.w
             );
         } else {
+
+
+            double p1x = double(p1.x) / double(p1.w);
+            double p1y = double(p1.y) / double(p1.w);
+            double p2x = double(p2.x) / double(p2.w);
+            double p2y = double(p2.y) / double(p2.w);            
+
+            double q1x = double(q1.x) / double(q1.w);
+            double q1y = double(q1.y) / double(q1.w);
+            double q2x = double(q2.x) / double(q2.w);
+            double q2y = double(q2.y) / double(q2.w);            
+
+            /*
+            double Ux = p2x - p1x;
+            double Uy = p2y - p1y;
+            double Vx = q2x - q1x;
+            double Vy = q2y - q1y;
+            double Dx = q1x - p1x;
+            double Dy = q1y - p1y;
+            double t = det2x2(Dx,Dy,Vx,Vy) / det2x2(Ux,Uy,Vx,Vy);
+            */
+            
+            double t = double(t_num) / double(t_denom);
+
+            std::cerr << "t = " << t << std::endl;
+
+            /*
+            double x = (t_denom - t_num)*p1x + t_num*p2x;
+            double y = (t_denom - t_num)*p1y + t_num*p2y;
+            double w = t_denom;
+            */
+
+            /*
+            double x = (t_denom - t_num)*double(p1.x)/double(p1.w) + t_num*double(p2.x)/double(p2.w);
+            double y = (t_denom - t_num)*double(p1.y)/double(p1.w) + t_num*double(p2.y)/double(p2.w);
+            double w = t_denom;
+            */
+
+            double x = (t_denom - t_num)*double(p1.x)*double(p2.w) + t_num*double(p2.x)*double(p1.w);
+            double y = (t_denom - t_num)*double(p1.y)*double(p2.w) + t_num*double(p2.y)*double(p1.w);
+            double w = t_denom * double(p1.w) * double(p2.w);
+
+            std::cerr << "x=" << x << " y=" << y << " w=" << w << std::endl;
+            
+
+            /*
+            double x = (t_denom - t_num)*double(p1.x)*double(p2.w) + t_num*double(p2.x)*double(p1.w);
+            double y = (t_denom - t_num)*double(p1.y)*double(p2.w) + t_num*double(p2.y)*double(p1.w);
+            double w = t_denom*double(p1.w)*double(p2.w);
+            */
+            
+            I = vec2ih(
+                int64_t(x),
+                int64_t(y),
+                int64_t(w)
+            );
+
+            /*
             I = vec2ih(
                 p1.x * p2.w * (t_denom - t_num) + p2.x * p1.w * t_num,
                 p1.y * p2.w * (t_denom - t_num) + p2.y * p1.w * t_num,
                 t_denom * p1.w * p2.w
             );
-        }
+            */
 
+        }
         
         {
             std::cerr << "INTERSECTION" << std::endl;
-            throw(std::logic_error("Intersecting constraints"));
-            /*
-            std::ofstream out("intersection.obj");
-            double x = double(I.x)/double(I.w);
-            double y = double(I.y)/double(I.w);
-            out << "v " << x << " " << y << " 0" << std::endl;
-            */
+            if(true) {
+                std::ofstream out("intersection.obj");
+                out << "v " << p1 << std::endl;
+                out << "v " << p2 << std::endl; 
+                out << "v " << q1 << std::endl;
+                out << "v " << q2 << std::endl; 
+                out << "l 1 2" << std::endl;
+                out << "l 3 4" << std::endl;
+                
+                double x = double(I.x)/double(I.w);
+                double y = double(I.y)/double(I.w);
+                out << "v " << x << " " << y << " 0" << std::endl;
+            }
+            // exit(-1);
+            // throw(std::logic_error("Intersecting constraints"));
         }
+
+        // save("with_last_intersection.obj");
         
         point_.push_back(I);
         v2T_.push_back(index_t(-1));
