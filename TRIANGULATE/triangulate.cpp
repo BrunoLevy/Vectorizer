@@ -144,6 +144,10 @@ namespace GEO {
         }
     }
 
+    /**
+     * \brief Greedely merge triangles that have the same
+     *  color while they form a convex polygon.
+     */
     void get_convex_polygon(
         CDT2di& T, index_t t, std::vector<GEO::index_t>& P
     ) {
@@ -246,7 +250,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
 
     // Read xfig file and send contents to constrained Delaunay
     // triangulation
-    try {
+    {
         std::string line;
         while(std::getline(in,line)) {
             int	object_code;    // always 3
@@ -342,20 +346,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         }
         triangulation.save(filename+"_triangulation.obj");
         GEO::classify_triangles(triangulation);
-    } catch(const std::logic_error& e) {
-        // I still have a problem with intersecting constraint for
-        // integer coordinates (to be fixed).
-        // We also have a problem when number of points is greater
-        // than 255 (cannot be stored in ST_NICCC file). Well, in
-        // fact we could use "direct" mode in that case (TODO...)
-        std::cerr << "Exception caught: " << e.what() << std::endl;
-        // If there was a problem, create an empty frame
-        ST_NICCC_FRAME frame;
-        st_niccc_frame_init(&frame);
-        st_niccc_write_frame(io,&frame);
-        st_niccc_write_end_of_frame(io);
-        return true;
-    }
+    } 
 
     // Write data to ST_NICCC file
     ST_NICCC_FRAME frame;
@@ -369,7 +360,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
             int y = (triangulation.point(v).y / triangulation.point(v).w);
             st_niccc_frame_set_vertex(&frame, v, x, y);
         }
-        st_niccc_write_frame(io,&frame);
+        st_niccc_write_frame_header(io,&frame);
 
         std::vector<GEO::index_t> P;
         uint8_t P8[15];
@@ -388,7 +379,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
             }
         }
     } else {
-        st_niccc_write_frame(io,&frame);
+        st_niccc_write_frame_header(io,&frame);
         uint8_t x[15];
         uint8_t y[15];
         std::vector<GEO::index_t> P;
@@ -432,7 +423,7 @@ int main(int argc, char** argv) {
     st_niccc_frame_init(&frame);
     st_niccc_frame_set_color(&frame, 0,   0,   0,   0);
     st_niccc_frame_set_color(&frame, 1, 255, 255, 255);
-    st_niccc_write_frame(&io,&frame);
+    st_niccc_write_frame_header(&io,&frame);
     st_niccc_write_end_of_frame(&io);
     
     while(fig_2_ST_NICCC(basename+to_string(id,4)+".fig",&io)) {
@@ -440,7 +431,7 @@ int main(int argc, char** argv) {
     }
 
     st_niccc_frame_init(&frame);
-    st_niccc_write_frame(&io,&frame);
+    st_niccc_write_frame_header(&io,&frame);
     st_niccc_write_end_of_stream(&io);
     
 }

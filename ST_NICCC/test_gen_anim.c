@@ -11,7 +11,7 @@ int main() {
     st_niccc_frame_set_color(&frame, 0, 0,   0,   0);
     st_niccc_frame_set_color(&frame, 1, 0, 255,   0);
     st_niccc_frame_set_color(&frame, 2, 0,   0, 255);
-    st_niccc_write_frame(&io, &frame);
+    st_niccc_write_frame_header(&io, &frame);
     st_niccc_write_end_of_frame(&io);
     
     int N = 20;
@@ -29,7 +29,7 @@ int main() {
             int y = (int)(128.0 + s*30);
             st_niccc_frame_set_vertex(&frame,i+1,x,y);
         }
-        st_niccc_write_frame(&io, &frame);
+        st_niccc_write_frame_header(&io, &frame);
         for(int i=0; i<N; ++i) {
             st_niccc_write_triangle_indexed(
                 &io, (i&1)+1, 0, 1+i, 1+((i+1)%N)

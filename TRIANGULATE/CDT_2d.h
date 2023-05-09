@@ -10,8 +10,10 @@
 #include <functional>
 #include <iostream>
 
-// Activate paranoid checks
+// Paranoid checks
+#ifndef NDEBUG
 #define GEO_DEBUG
+#endif
 
 #ifdef GEO_DEBUG
 #define geo_debug_assert(x) assert(x)
@@ -1283,18 +1285,7 @@ namespace GEO {
          * \return the index of the created point. Duplicated points are
          *  detected (and then the index of the existing point is returned)
          */
-        index_t insert(const vec2ih& p, index_t hint = index_t(-1)) {
-            debug_check_consistency();            
-            point_.push_back(p);
-            index_t v = CDTBase2d::insert(point_.size()-1, hint);
-            // If inserted point already existed in
-            // triangulation, then nv() did not increase
-            if(point_.size() > nv()) {
-                point_.pop_back();
-            }
-            debug_check_consistency();                        
-            return v;
-        }
+        index_t insert(const vec2ih& p, index_t hint = index_t(-1)); 
 
         /**
          * \copydoc CDT2d::insert_constraint()

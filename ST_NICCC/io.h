@@ -101,7 +101,7 @@ void st_niccc_frame_set_vertex(
     uint8_t index, uint8_t x, uint8_t y
 );
 
-void st_niccc_write_frame(
+void st_niccc_write_frame_header(
     ST_NICCC_IO* io, ST_NICCC_FRAME* frame
 );
 

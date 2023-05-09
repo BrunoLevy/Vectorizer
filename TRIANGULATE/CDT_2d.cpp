@@ -138,6 +138,30 @@ namespace GEO {
         );
     }
 
+    static inline int64_t gcd(int64_t a, int64_t b) {
+        a = std::abs(a);
+        b = std::abs(b);
+        if(a < b) {
+            std::swap(a,b);
+        }
+        int64_t temp;
+        while (b != 0) {
+            temp = a % b;
+            a = b;
+            b = temp;
+        }
+        return a;
+    }
+    
+    inline void simplify(vec2ih& V) {
+        if(V.w == 1) {
+            return;
+        }
+        int64_t d = gcd(gcd(V.x,V.w),gcd(V.y,V.w));
+        V.x /= d;
+        V.y /= d;
+        V.w /= d;
+    }
 
     template <class T>
     inline Sign geo_sgn(T x) {
@@ -1128,12 +1152,29 @@ namespace GEO {
     /********************************************************************/
 
     CDT2di::CDT2di() {
+        // Our incircle() predicate uses double-precision numbers instead
+        // of integer exact arithmetics, because when there are intersecting
+        // constraints, it overflows int64_t precision.
         exact_incircle_ = false;
     }
     
     CDT2di::~CDT2di() {
     }
 
+    index_t CDT2di::insert(const vec2ih& p, index_t hint) {
+        debug_check_consistency();            
+        point_.push_back(p);
+        simplify(*(point_.rbegin()));
+        index_t v = CDTBase2d::insert(point_.size()-1, hint);
+        // If inserted point already existed in
+        // triangulation, then nv() did not increase
+        if(point_.size() > nv()) {
+            point_.pop_back();
+        }
+        debug_check_consistency();                        
+        return v;
+    }
+    
     void CDT2di::insert_constraint(index_t i, index_t j) {
         constraint_.push_back(std::make_pair(i,j));
         CDTBase2d::insert_constraint(i,j);
@@ -1142,6 +1183,7 @@ namespace GEO {
     void CDT2di::clear() {
         CDTBase2d::clear();
         point_.resize(0);
+        constraint_.resize(0);
     }
     
     void CDT2di::create_enclosing_triangle(
@@ -1190,12 +1232,57 @@ namespace GEO {
         );
     }
 
+    static inline void approx_vec2ih_diff(
+        const vec2ih& U, const vec2ih& V,
+        double& x, double& y, double& w
+    ) {
+        if(U.w == V.w) {
+            x = double(U.x - V.x);
+            y = double(U.y - V.y);
+            w = double(U.w);
+        } else {
+            x = double(V.w)*double(U.x) - double(U.w)-double(V.x);
+            y = double(V.w)*double(U.y) - double(U.w)-double(V.y);
+            w = double(U.w)*double(V.w);
+        }
+    }
+    
     Sign CDT2di::incircle(index_t i, index_t j, index_t k, index_t l) const {
         geo_debug_assert(i < nv());
         geo_debug_assert(j < nv());
         geo_debug_assert(k < nv());
         geo_debug_assert(l < nv());
 
+        // incircle() is computed with (approximate) double-precision
+        // arithmetics, from the integer homogeneous coordinates,
+        // because the exact integer-only version overflows
+        // int64_t capacity when there are intersecting constraints.
+        // CDT2dBase supports approximate incircle() predicate
+        // (then it does additional convexity checks before flipping
+        // edges to restore Delaunay-ness). 
+
+        // this version does not work with test4.obj 
+        // (to be understood, it is probably wrong)
+        /*
+        double Ux,Uy,Uw,Vx,Vy,Vw,Wx,Wy,Ww;
+        
+        approx_vec2ih_diff(point_[i], point_[l], Ux,Uy,Uw);
+        approx_vec2ih_diff(point_[j], point_[l], Vx,Vy,Vw);        
+        approx_vec2ih_diff(point_[k], point_[l], Wx,Wy,Ww);
+        
+        double lU = Ux*Ux+Uy*Uy;
+        double lV = Vx*Vx+Vy*Vy;
+        double lW = Wx*Wx+Wy*Wy;
+
+        return Sign(
+            geo_sgn(det3x3(
+                Uw*Ux, Uw*Uy, lU,
+                Vw*Vx, Vw*Vy, lV,
+                Ww*Wx, Ww*Wy, lW
+            )) 
+        );
+        */
+        
         double Ux = double(point_[i].x)/double(point_[i].w) -
                     double(point_[l].x)/double(point_[l].w);
 
@@ -1225,8 +1312,11 @@ namespace GEO {
                 Wx, Wy, lW
             )) 
         );
-        
-        
+
+        // This is the exact commented-out version, that
+        // overflows int64_t capacity when there are
+        // intersecting constraints (so we use the approximate
+        // double-precision version above).
         /*
         vec2ih U = point_[i]-point_[l];
         vec2ih V = point_[j]-point_[l];
@@ -1267,11 +1357,6 @@ namespace GEO {
         const vec2ih& q1 = point_[k];
         const vec2ih& q2 = point_[l];        
 
-        std::cerr << "P1 = " << p1 << std::endl;
-        std::cerr << "P2 = " << p2 << std::endl;
-        std::cerr << "Q1 = " << q1 << std::endl;
-        std::cerr << "Q2 = " << q2 << std::endl;        
-        
         vec2ih U = p2-p1;
         vec2ih V = q2-q1;
         vec2ih D = q1-p1;
@@ -1286,94 +1371,20 @@ namespace GEO {
                 p1.y * (t_denom - t_num) + p2.y * t_num,
                 t_denom * p1.w
             );
+            simplify(I);
         } else {
-
-
-            double p1x = double(p1.x) / double(p1.w);
-            double p1y = double(p1.y) / double(p1.w);
-            double p2x = double(p2.x) / double(p2.w);
-            double p2y = double(p2.y) / double(p2.w);            
-
-            double q1x = double(q1.x) / double(q1.w);
-            double q1y = double(q1.y) / double(q1.w);
-            double q2x = double(q2.x) / double(q2.w);
-            double q2y = double(q2.y) / double(q2.w);            
-
-            /*
-            double Ux = p2x - p1x;
-            double Uy = p2y - p1y;
-            double Vx = q2x - q1x;
-            double Vy = q2y - q1y;
-            double Dx = q1x - p1x;
-            double Dy = q1y - p1y;
-            double t = det2x2(Dx,Dy,Vx,Vy) / det2x2(Ux,Uy,Vx,Vy);
-            */
-            
-            double t = double(t_num) / double(t_denom);
-
-            std::cerr << "t = " << t << std::endl;
-
-            /*
-            double x = (t_denom - t_num)*p1x + t_num*p2x;
-            double y = (t_denom - t_num)*p1y + t_num*p2y;
-            double w = t_denom;
-            */
-
-            /*
-            double x = (t_denom - t_num)*double(p1.x)/double(p1.w) + t_num*double(p2.x)/double(p2.w);
-            double y = (t_denom - t_num)*double(p1.y)/double(p1.w) + t_num*double(p2.y)/double(p2.w);
-            double w = t_denom;
-            */
-
-            double x = (t_denom - t_num)*double(p1.x)*double(p2.w) + t_num*double(p2.x)*double(p1.w);
-            double y = (t_denom - t_num)*double(p1.y)*double(p2.w) + t_num*double(p2.y)*double(p1.w);
-            double w = t_denom * double(p1.w) * double(p2.w);
-
-            std::cerr << "x=" << x << " y=" << y << " w=" << w << std::endl;
-            
-
-            /*
-            double x = (t_denom - t_num)*double(p1.x)*double(p2.w) + t_num*double(p2.x)*double(p1.w);
-            double y = (t_denom - t_num)*double(p1.y)*double(p2.w) + t_num*double(p2.y)*double(p1.w);
-            double w = t_denom*double(p1.w)*double(p2.w);
-            */
-            
-            I = vec2ih(
-                int64_t(x),
-                int64_t(y),
-                int64_t(w)
-            );
-
-            /*
+            // Happens when there is an intersection between constraints
+            // where one of the constraints has a previous constraint
+            // intersection as a vertex. Since this overflows int64_t
+            // capacity in most cases, we abort.
+            geo_assert_not_reached;
             I = vec2ih(
                 p1.x * p2.w * (t_denom - t_num) + p2.x * p1.w * t_num,
                 p1.y * p2.w * (t_denom - t_num) + p2.y * p1.w * t_num,
                 t_denom * p1.w * p2.w
             );
-            */
-
+            simplify(I);
         }
-        
-        {
-            std::cerr << "INTERSECTION" << std::endl;
-            if(true) {
-                std::ofstream out("intersection.obj");
-                out << "v " << p1 << std::endl;
-                out << "v " << p2 << std::endl; 
-                out << "v " << q1 << std::endl;
-                out << "v " << q2 << std::endl; 
-                out << "l 1 2" << std::endl;
-                out << "l 3 4" << std::endl;
-                
-                double x = double(I.x)/double(I.w);
-                double y = double(I.y)/double(I.w);
-                out << "v " << x << " " << y << " 0" << std::endl;
-            }
-            // exit(-1);
-            // throw(std::logic_error("Intersecting constraints"));
-        }
-
-        // save("with_last_intersection.obj");
         
         point_.push_back(I);
         v2T_.push_back(index_t(-1));
