@@ -8,6 +8,9 @@
 #include <vector>
 #include <cmath>
 
+// Completely fill the frame with triangles (instead of clearing the frame),
+// this creates a heavier file, but reduces flicker on small OLED screens
+// that do not have vsync.
 bool filled = true;
 
 /**
@@ -59,9 +62,14 @@ namespace GEO {
     int black_pixel_borders=0;
     
     /**
-     * \brief Classifies triangles, keeps only the ones inside the shape
+     * \brief Classifies triangles.
+     * \details 
+     *  if \p filled is set to false, it keeps only the triangles
+     *  inside the shape, else it sets T_REGION1_FLAG for the triangles
+     *  inside the shape.
+     *  
      */
-    void classify_triangles(CDT2di& T) {
+    void classify_triangles(CDT2di& T, bool filled = true) {
         
         CDT2di::DList S(T, CDT2di::DLIST_S_ID);
         
@@ -74,9 +82,9 @@ namespace GEO {
             ) {
                 T.Tset_flag(t, CDT2di::T_MARKED_FLAG);
                 if(
-                    (T.Tadj(t,0)==index_t(-1)&&!T.Tedge_is_constrained(t,0)) ||
-                    (T.Tadj(t,1)==index_t(-1)&&!T.Tedge_is_constrained(t,1)) ||
-                    (T.Tadj(t,2)==index_t(-1)&&!T.Tedge_is_constrained(t,2))
+                    (T.Tadj(t,0)==index_t(-1)&&!T.Tedge_is_constrained_parity(t,0)) ||
+                    (T.Tadj(t,1)==index_t(-1)&&!T.Tedge_is_constrained_parity(t,1)) ||
+                    (T.Tadj(t,2)==index_t(-1)&&!T.Tedge_is_constrained_parity(t,2))
                 ) {
                     T.Tset_flag(t, CDT2di::T_REGION1_FLAG);
                 }
@@ -95,7 +103,7 @@ namespace GEO {
                 ) {
                     T.Tset_flag(t2,CDT2di::T_MARKED_FLAG);
                     if(
-                        T.Tedge_is_constrained(t1,le) ^ 
+                        T.Tedge_is_constrained_parity(t1,le) ^ 
                         T.Tflag_is_set(t1,CDT2di::T_REGION1_FLAG)
                     ) {
                         T.Tset_flag(t2,CDT2di::T_REGION1_FLAG);
@@ -227,6 +235,7 @@ namespace GEO {
 bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
 
     GEO::CDT2di triangulation;
+    triangulation.set_delaunay(false);
     
     int xmin = 0;
     int xmax = 0;
@@ -345,7 +354,7 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
             }
         }
         triangulation.save(filename+"_triangulation.obj");
-        GEO::classify_triangles(triangulation);
+        GEO::classify_triangles(triangulation,filled);
     } 
 
     // Write data to ST_NICCC file

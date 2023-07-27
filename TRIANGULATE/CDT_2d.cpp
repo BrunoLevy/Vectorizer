@@ -60,7 +60,7 @@
 //    - t2 was always in Q already (because it has an edge
 //      that has an intersection with the constraint), but
 //      there is one case where it leaves Q
-// DList as an O(1) function to test whether an element is in the list (using
+// DList has an O(1) function to test whether an element is in the list (using
 // flags associated with the elements). It is used in one case: when t2 is
 // is not in Q, it means there is no intersection.
 
@@ -379,7 +379,21 @@ namespace GEO {
 
         debug_check_consistency();        
     }
-
+    
+    void CDTBase2d::Tset_edge_cnstr_with_neighbor(
+        index_t t, index_t le, index_t cnstr_id 
+    ) {
+        geo_debug_assert(t < nT());
+        geo_debug_assert(le < 3);
+        Tset_edge_cnstr(t, le, cnstr_id);
+        index_t t2 = Tadj(t,le);
+        if(t2 != index_t(-1)) {
+            index_t le2 = Tadj_find(t2,t);
+            Tset_edge_cnstr(t2,le2,cnstr_id);
+        }
+    }
+    
+    
     /**
      * \brief Used by the implementation of find_intersected_edges()
      * \details During traversal of a constrained edge [i,j], we can be on
@@ -613,13 +627,13 @@ namespace GEO {
             index_t t1 = Q.pop_back();
             if(!is_convex_quad(t1)) {
                 // Sanity check: if the only remaining edge to flip does
-                // not form a convexdd quad, it means we are going to
+                // not form a convex quad, it means we are going to
                 // flip forever ! (shoud not happen)
                 geo_assert(!Q.empty());
                 Q.push_front(t1);
             } else {
                 index_t t2 = Tadj(t1,0);
-                bool no_isect  = !Q.contains(t2);
+                bool no_isect  = !Q.contains(t2); // O(1), Q uses flags
                 index_t v0     = Tv(t1,0);
                 bool t2v0_t1v2 = (Q.contains(t2) && Tv(t2,0) == Tv(t1,2));
                 bool t2v0_t1v1 = (Q.contains(t2) && Tv(t2,0) == Tv(t1,1));
@@ -680,7 +694,7 @@ namespace GEO {
             index_t v1 = Tv(t2,0);
             index_t v2 = Tv(t2,1);
             index_t v3 = Tv(t2,2);
-            if(incircle(v1,v2,v3,v) == POSITIVE) {
+            if(incircle(v1,v2,v3,v) == POSITIVE && incircle(v1,v2,v,v3) == NEGATIVE) { // HERE
                 swap_edge(t1);
                 S.push_back(t1);
                 S.push_back(t2);                    
@@ -708,7 +722,7 @@ namespace GEO {
                 }
                 index_t e2 = Tadj_find(t2,t1);
                 index_t v3 = Tv(t2,e2);
-                if(incircle(v0,v1,v2,v3) == POSITIVE) {
+                if(incircle(v0,v1,v2,v3) == POSITIVE && incircle(v0,v1,v3,v2) == NEGATIVE) { // HERE
                     // t2 may also encode a new edge, we need to preserve it,
                     // by chosing the right swap:
                     if(Tv(t2,0) == Tv(t1,1)) {
@@ -1263,6 +1277,7 @@ namespace GEO {
 
         // this version does not work with test4.obj 
         // (to be understood, it is probably wrong)
+
         /*
         double Ux,Uy,Uw,Vx,Vy,Vw,Wx,Wy,Ww;
         
@@ -1282,7 +1297,9 @@ namespace GEO {
             )) 
         );
         */
-        
+
+        // This version seems to work, except for frame 2357
+
         double Ux = double(point_[i].x)/double(point_[i].w) -
                     double(point_[l].x)/double(point_[l].w);
 
@@ -1313,6 +1330,7 @@ namespace GEO {
             )) 
         );
 
+        
         // This is the exact commented-out version, that
         // overflows int64_t capacity when there are
         // intersecting constraints (so we use the approximate
@@ -1415,5 +1433,24 @@ namespace GEO {
             }
         }
     }
+
+    void CDT2di::Tset_edge_cnstr_with_neighbor(
+        index_t t, index_t le, index_t cnstr_id 
+    ) {
+        CDTBase2d::Tset_edge_cnstr_with_neighbor(
+            t,le,cnstr_id
+        );
+
+        index_t v1 = Tv(t, (le + 1)%3);
+        index_t v2 = Tv(t, (le + 2)%3);
+        auto K = std::make_pair(std::min(v1,v2), std::max(v1,v2));
+        auto it = constraint_count_.find(K);
+        if(it == constraint_count_.end()) {
+            constraint_count_[K] = 1;
+        } else {
+            it->second++;
+        }
+    }
+    
 }
 

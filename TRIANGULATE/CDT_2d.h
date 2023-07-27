@@ -9,6 +9,7 @@
 #include <utility>
 #include <functional>
 #include <iostream>
+#include <map>
 
 // Paranoid checks
 #ifndef NDEBUG
@@ -804,18 +805,9 @@ namespace GEO {
          * \param[in] le local edge index, in 0,1,2
          * \param[in] cnstr_id identifier of the constrained edge
          */
-        void Tset_edge_cnstr_with_neighbor(
+        virtual void Tset_edge_cnstr_with_neighbor(
             index_t t, index_t le, index_t cnstr_id 
-        ) {
-            geo_debug_assert(t < nT());
-            geo_debug_assert(le < 3);
-            Tset_edge_cnstr(t, le, cnstr_id);
-            index_t t2 = Tadj(t,le);
-            if(t2 != index_t(-1)) {
-                index_t le2 = Tadj_find(t2,t);
-                Tset_edge_cnstr(t2,le2,cnstr_id);
-            }
-        }
+        );
         
         /**
          * \brief Tests whether an edge is constrained
@@ -1325,10 +1317,36 @@ namespace GEO {
             index_t E1, index_t i, index_t j,
             index_t E2, index_t k, index_t l
         ) override;
+
+        /**
+         * \copydoc CDTBase2d::Tset_edge_cnstr_with_neighbor()
+         */
+        void Tset_edge_cnstr_with_neighbor(
+            index_t t, index_t le, index_t cnstr_id 
+        ) override;
+
+        
+        bool Tedge_is_constrained_parity(index_t t, index_t le) {
+            // return Tedge_is_constrained(t,le);
+            //
+            if(!Tedge_is_constrained(t,le)) {
+                return false;
+            }
+            index_t v1 = Tv(t, (le + 1)%3);
+            index_t v2 = Tv(t, (le + 2)%3);
+            auto K = std::make_pair(std::min(v1,v2), std::max(v1,v2));
+            auto it = constraint_count_.find(K);
+            if(it == constraint_count_.end()) {
+                return false;
+            }
+            geo_assert(it != constraint_count_.end());
+            return ((it->second & 1) != 0);
+        }
         
     protected:
         vector<vec2ih> point_;
         vector< std::pair<index_t, index_t> > constraint_;
+        std::map< std::pair<index_t, index_t>, index_t > constraint_count_;
     };
 
     /*****************************************************************/    
