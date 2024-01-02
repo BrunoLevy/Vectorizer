@@ -12,24 +12,122 @@
 
 namespace GEO {
 
-    /*
-    typedef CDT2d Triangulation;
-    inline vec2 make_point(double x, double y) {
-        return vec2(x,y);
-    }
-    */
 
-    typedef ExactCDT2d Triangulation;
-    inline exact::vec2h make_point(double x, double y) {
-        return exact::vec2h(x,y,1.0);
-    }
+    class Triangulation : public ExactCDT2d {
+    public:
+        index_t insert(double x, double y) {
+            return ExactCDT2d::insert(exact::vec2h(x,y,1.0));
+        }
+        
+        void classify() {
+            classify_triangles("union",true); // classify only
+            T_region_.assign(nT(),-1);
+            for(index_t t=0; t<nT(); ++t) {
+                T_region_[t] = Tflag_is_set(t,T_MARKED_FLAG) ? 1 : 0;
+                Treset_flag(t, T_MARKED_FLAG);
+            }
+        }
+        
+        int get_x(index_t v) const {
+            double x = point(v).x.estimate();
+            double w = point(v).w.estimate();
+            return int(x/w);
+        }
+        
+        int get_y(index_t v) const {
+            double y = point(v).y.estimate();
+            double w = point(v).w.estimate();
+            return int(y/w);
+        }
 
+        int Tregion(index_t t) const {
+            return T_region_[t];
+        }
+
+        bool Tis_marked(index_t t) {
+            return Tflag_is_set(t,T_MARKED_FLAG);
+        }
+
+        /**
+         * \brief Greedely merge triangles that have the same
+         *  color while they form a convex polygon.
+         */
+        void get_convex_polygon(
+            index_t t, std::vector<GEO::index_t>& P
+        ) {
+            P.resize(0);
+            P.push_back(Tv(t,0));
+            P.push_back(Tv(t,1));
+            P.push_back(Tv(t,2));
+            DList S(*this, DLIST_S_ID);
+            Tset_flag(t, T_MARKED_FLAG);
+            S.push_back(t);
+
+            while(!S.empty() && P.size()<15) {
+                index_t t1 = S.front();
+                S.pop_front();
+                for(index_t le1=0; (le1<3 && P.size()<15); ++le1) {
+                    index_t t2 = Tadj(t1,le1);
+
+                    if(t2 == index_t(-1)) {
+                        continue;
+                    }
+
+                if(Tflag_is_set(t2,T_MARKED_FLAG)) {
+                    continue;
+                }
+                
+                if(Tregion(t1) != Tregion(t2)) {
+                    continue;
+                }
+                
+                index_t le2 = Tadj_find(t2,t1);
+                index_t v1 = Tv(t1,(le1+1)%3);
+                index_t v2 = Tv(t1,(le1+2)%3);                
+                index_t v3 = Tv(t2,le2);
+
+                if(false) {
+                    std::cerr << "v1=" << v1
+                              << " v2=" << v2
+                              << " v3=" << v3 << std::endl;
+                    std::cerr << "P=[";
+                    for(index_t i=0; i<P.size(); ++i) {
+                        std::cerr << P[i] << " ";
+                    }
+                    std::cerr << "]" << std::endl;
+                }
+                
+                index_t i1 = index_t(
+                    std::find(P.begin(), P.end(), v1)-P.begin()
+                );
+                assert(i1 < P.size());
+                index_t i2 = index_t(
+                    std::find(P.begin(), P.end(), v2)-P.begin()
+                );
+                assert(i2 < P.size());
+                assert((i1+1)%P.size() == i2);
+
+                index_t i1_prev = (i1+P.size()-1)%P.size();
+                index_t i2_next = (i2+1)%P.size();
+
+                if(
+                    orient2d(P[i1_prev],P[i1],v3) >= 0 &&
+                    orient2d(v3,P[i2],P[i2_next]) >= 0 
+                ) {
+                    Tset_flag(t2,T_MARKED_FLAG);
+                    S.push_back(t2);
+                    P.insert(P.begin()+i2,v3);
+                }
+                }
+            }
+        }
+        
+    private:
+        vector<int> T_region_;
+    };
+    
 }
 
-// Completely fill the frame with triangles (instead of clearing the frame),
-// this creates a heavier file, but reduces flicker on small OLED screens
-// that do not have vsync.
-bool filled = true;
 
 /**
  * \brief Generates a string of length \p len from integer \p i
@@ -43,41 +141,6 @@ std::string to_string(int i, int len) {
         result = "0" + result;
     }
     return result;
-}
-
-namespace GEO {
-   /**
-    * \brief Tests whether a constraint is degenerate
-    * \details A constraint is degenerate if all vertices are 
-    *  aligned. Such constraints make the in/out classification
-    *  algorithm fail because they do not have an interior.
-    * \param[in] triangulation a const reference to the CDT2di
-    * \param[in] vertices a vector with the indices of the vertices
-    *  on the constraint
-    * \retval true if all vertices are aligned
-    * \retval false otherwise
-    */
-    bool constraint_is_degenerate(
-        const GEO::Triangulation& triangulation,
-        std::vector<GEO::index_t>& vertices
-    ) {
-        for(int i=0; i<int(vertices.size()); ++i) {
-            for(int j=i+1; j<int(vertices.size()); ++j) {
-                for(int k=j+1; k<int(vertices.size()); ++k) {
-                    auto p1 = triangulation.point(vertices[i]);
-                    auto p2 = triangulation.point(vertices[j]);
-                    auto p3 = triangulation.point(vertices[k]);
-                    if(PCK::orient_2d(p1,p2,p3) != GEO::ZERO) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
-
-    int black_pixel_borders=0;
-    
 }
 
 
@@ -170,25 +233,12 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                         win_ymin = std::min(win_ymin,x);
                         win_ymax = std::max(win_ymax,y);                        
                     }
-                    vertices.push_back(
-                        triangulation.insert(GEO::make_point(x,y))
+                    vertices.push_back(triangulation.insert(x,y));
+                }
+                for(int i=0; i<npoints; ++i) {
+                    triangulation.insert_constraint(
+                        vertices[i], vertices[(i+1)%npoints], 1
                     );
-                }
-
-                if(update_win) {
-                    GEO::black_pixel_borders =
-                        (256*256)-(win_xmax-win_xmin)*(win_ymax-win_ymin);
-                }
-                
-                // If all vertices on constraint are aligned, then
-                // ignore the constraint, because it would break the
-                // in/out rule.
-                if(!constraint_is_degenerate(triangulation, vertices)) {
-                    for(int i=0; i<npoints; ++i) {
-                        triangulation.insert_constraint(
-                            vertices[i], vertices[(i+1)%npoints]
-                        );
-                    }
                 }
                 ++nb_paths;
             } else if( // object 6: bounding box
@@ -210,22 +260,20 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
                                           << filename
                                           << "_triangulation.obj"
                                           << std::endl;
-        triangulation.save(filename+"_triangulation.obj");
-        // GEO::classify_triangles(triangulation,filled);
+
+        triangulation.classify();
+        //triangulation.save(filename+"_triangulation.obj");
     } 
 
     // Write data to ST_NICCC file
     ST_NICCC_FRAME frame;
     st_niccc_frame_init(&frame);
-    if(!filled) {
-        st_niccc_frame_clear(&frame);
-    }
+    // st_niccc_frame_clear(&frame); Not needed, we clear the frame
 
-    /*
     if(triangulation.nv() <= 255) {
         for(GEO::index_t v=0; v<triangulation.nv(); ++v) {
-            int x = int(triangulation.point(v).x);
-            int y = int(triangulation.point(v).y);
+            int x = triangulation.get_x(v);
+            int y = triangulation.get_y(v);
             st_niccc_frame_set_vertex(&frame, v, x, y);
         }
         st_niccc_write_frame_header(io,&frame);
@@ -233,11 +281,9 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         std::vector<GEO::index_t> P;
         uint8_t P8[15];
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-            if(!triangulation.Tflag_is_set(t,GEO::CDT2d::T_MARKED_FLAG)) {
-                uint8_t color = triangulation.Tflag_is_set(
-                    t,GEO::CDT2d::T_REGION1_FLAG
-                ) ? 0 : 1;
-                get_convex_polygon(triangulation, t, P);
+            if(!triangulation.Tis_marked(t)) {
+                uint8_t color = uint8_t(triangulation.Tregion(t));
+                triangulation.get_convex_polygon(t, P);
                 for(int i=0; i<int(P.size()); ++i) {
                     P8[i] = uint8_t(P[i]);
                 }
@@ -252,15 +298,13 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         uint8_t y[15];
         std::vector<GEO::index_t> P;
         for(GEO::index_t t=0; t<triangulation.nT(); ++t) {
-            if(!triangulation.Tflag_is_set(t,GEO::CDT2d::T_MARKED_FLAG)) {
-                uint8_t color = triangulation.Tflag_is_set(
-                    t,GEO::CDT2d::T_REGION1_FLAG
-                ) ? 0 : 1;
-                get_convex_polygon(triangulation, t, P);
+            if(!triangulation.Tis_marked(t)) {
+                uint8_t color = uint8_t(triangulation.Tregion(t));
+                triangulation.get_convex_polygon(t, P);
                 for(int i=0; i<int(P.size()); ++i) {
                     GEO::index_t v = P[i];
-                    x[i] = uint8_t(triangulation.point(v).x);
-                    y[i] = uint8_t(triangulation.point(v).y);
+                    x[i] = uint8_t(triangulation.get_x(v));
+                    y[i] = uint8_t(triangulation.get_y(v));
                 }
                 st_niccc_write_polygon(
                     io,color,P.size(),x,y
@@ -269,7 +313,6 @@ bool fig_2_ST_NICCC(const std::string& filename, ST_NICCC_IO* io) {
         }
     }
     st_niccc_write_end_of_frame(io);
-    */
     
     std::cerr << "Loaded " << nb_paths << " paths" << std::endl;
     return true;

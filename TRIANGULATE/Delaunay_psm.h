@@ -11904,7 +11904,9 @@ namespace GEO {
             id_[v] = id;
         }
 
-        void classify_triangles(const std::string& boolean_expression);
+        void classify_triangles(
+            const std::string& boolean_expression, bool mark_only=false
+        );
 
         void save(const std::string& filename) const override;
         

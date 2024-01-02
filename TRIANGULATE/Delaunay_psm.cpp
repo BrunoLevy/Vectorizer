@@ -34486,7 +34486,9 @@ namespace GEO {
         return x;
     }
 
-    void ExactCDT2d::classify_triangles(const std::string& expr) {
+    void ExactCDT2d::classify_triangles(
+        const std::string& expr, bool mark_only
+    ) {
         
         facet_inclusion_bits_.assign(nT(), 0);
 
@@ -34557,7 +34559,9 @@ namespace GEO {
                 }
             }
         }
-        remove_marked_triangles();
+        if(!mark_only) {
+            remove_marked_triangles();
+        }
     }
     
     void ExactCDT2d::save(const std::string& filename) const {
